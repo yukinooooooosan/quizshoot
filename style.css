@@ -17,6 +17,8 @@
   --glow-accent: 0 0 12px rgba(255, 107, 53, 0.4);
   --font-retro: 'Press Start 2P', 'Courier New', monospace;
   --font-jp: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  --dpad-grow: 16px;
+  --dpad-compact-grow: 12px;
 }
 
 /* --- Reset & Base --- */
@@ -271,8 +273,8 @@ html, body {
     ".    up    ."
     "left center right"
     ".    down  .";
-  grid-template-columns: 64px 64px 64px;
-  grid-template-rows: 56px 56px 56px;
+  grid-template-columns: repeat(3, calc(64px + var(--dpad-grow)));
+  grid-template-rows: repeat(3, calc(56px + var(--dpad-grow)));
   gap: 5px;
   justify-content: center;
 }
@@ -283,7 +285,7 @@ html, body {
   background: rgba(20, 25, 50, 0.9);
   color: var(--text);
   font-family: var(--font-jp);
-  font-size: 22px;
+  font-size: calc(22px + (var(--dpad-grow) * 0.2));
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -718,11 +720,11 @@ html, body {
 /* --- Responsive --- */
 @media (max-height: 640px) {
   #dpad {
-    grid-template-columns: 54px 54px 54px;
-    grid-template-rows: 46px 46px 46px;
+    grid-template-columns: repeat(3, calc(54px + var(--dpad-compact-grow)));
+    grid-template-rows: repeat(3, calc(46px + var(--dpad-compact-grow)));
     gap: 3px;
   }
-  .dpad-btn { font-size: 18px; }
+  .dpad-btn { font-size: calc(18px + (var(--dpad-compact-grow) * 0.2)); }
   .char-slot { width: 40px; height: 40px; font-size: 18px; }
   #question-text { font-size: 14px; }
   #quiz-panel { padding: 8px 12px 12px; }

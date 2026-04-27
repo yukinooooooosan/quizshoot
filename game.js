@@ -5,12 +5,13 @@ import { STAGE_DEFS } from './stage_defs.js';
 // ========== 定数 ==========
 const CW = 480;
 const CH = 360;
-const DEFENSE_Y = CH - 50;
+const PLAYFIELD_BOTTOM_LIFT = 16;
+const DEFENSE_Y = CH - 50 - PLAYFIELD_BOTTOM_LIFT;
 const DANGER_Y = CH * 0.55;
 const DANGER_APPROACH_DESCENT_MULT = 1.65;
 const DANGER_ZONE_DESCENT_MULT = 0.35;
 const DEBUG_SHORTCUTS = true;
-const PLAYER_Y = CH - 30;
+const PLAYER_Y = CH - 30 - PLAYFIELD_BOTTOM_LIFT;
 const ENEMY_PIXEL = 4;
 const ENEMY_W = 28;
 const ENEMY_H = 28;
