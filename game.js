@@ -265,7 +265,7 @@ class Star {
   reset(initial = false) {
     this.x = Math.random() * CW;
     this.y = initial ? Math.random() * CH : -2;
-    this.speed = rand(0.15, 0.6);
+    this.speed = rand(0.2, 0.8);
     this.size = rand(0.5, 2);
     this.brightness = rand(0.3, 0.9);
   }
@@ -1815,8 +1815,9 @@ class Game {
   }
 
   _drawPlayer(ctx, options = {}) {
+    const hover = options.disableHover ? 0 : Math.sin(Date.now() / 180) * 2;
     const cx = CW / 2 + this.playerOffsetX;
-    const cy = (options.y ?? PLAYER_Y) + this.playerOffsetY;
+    const cy = (options.y ?? PLAYER_Y) + this.playerOffsetY + hover;
     const boostScale = options.boostScale ?? 1;
     const rank = this.weaponRankIndex + 1;
     const rankColor = ['#00ff88', '#ff6b35', '#4d96ff', '#cc65fe'][rank - 1] || '#00ff88';
