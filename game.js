@@ -1491,9 +1491,35 @@ class Game {
         const dangerRange = DEFENSE_Y - dangerStart;
         const dangerRatio = Math.max(0, Math.min(1, (lowestY - dangerStart) / dangerRange));
         if (dangerRatio > 0) {
-          const dangerAlpha = 0.1 + dangerRatio * 0.22;
-          ctx.fillStyle = `rgba(255, 0, 0, ${dangerAlpha})`;
+          const dangerPulse = 0.035 * (0.5 + Math.sin(Date.now() / 120) * 0.5);
+          const dangerAlpha = 0.08 + dangerRatio * 0.22 + dangerPulse;
+          const dangerRed = Math.round(70 + dangerRatio * 130);
+          const dangerBlue = Math.round(18 + dangerRatio * 12);
+          ctx.fillStyle = `rgba(${dangerRed}, 0, ${dangerBlue}, ${dangerAlpha})`;
           ctx.fillRect(-10, -10, CW + 20, CH + 20);
+
+          const bandY = DEFENSE_Y - 2;
+          const bandH = CH - bandY + 10;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, bandY, CW, CH - bandY);
+          ctx.clip();
+          ctx.fillStyle = `rgba(255, 0, 0, ${0.18 + dangerRatio * 0.18})`;
+          ctx.fillRect(0, bandY, CW, bandH);
+
+          const marqueeGap = 188;
+          const marqueeSpeed = 0.11;
+          const offset = (Date.now() * marqueeSpeed) % marqueeGap;
+          ctx.font = '18px "Press Start 2P", monospace';
+          ctx.textAlign = 'left';
+          ctx.shadowBlur = 16;
+          ctx.shadowColor = '#ff4757';
+          ctx.fillStyle = 'rgba(255, 71, 87, 0.9)';
+          for (let x = CW - offset; x > -marqueeGap; x -= marqueeGap) {
+            ctx.fillText('DANGER', x, bandY + bandH / 2);
+          }
+          ctx.shadowBlur = 0;
+          ctx.restore();
         }
       }
 
@@ -1625,23 +1651,6 @@ class Game {
         ctx.moveTo(28, -2);
         ctx.lineTo(14, -2);
         ctx.stroke();
-        ctx.restore();
-      }
-
-      if (this.state === 'playing' && this._isInDangerZone()) {
-        const bonus = DANGER_ATTACK_BONUS_BY_RANK[this.weaponRankIndex];
-        const canDangerBoost = bonus > 0 && !this.dangerBoostUsed;
-        const pulse = 0.58 + Math.sin(Date.now() / 70) * 0.38;
-        const y = PLAYER_Y + this.playerOffsetY - 18;
-        ctx.save();
-        ctx.globalAlpha = pulse;
-        ctx.textAlign = 'center';
-        ctx.font = '10px "Press Start 2P", monospace';
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = '#ff4757';
-        ctx.fillStyle = '#ff4757';
-        ctx.fillText(canDangerBoost ? 'DANGER BOOST' : 'DANGER ZONE', CW / 2 + this.playerOffsetX, y);
-        ctx.shadowBlur = 0;
         ctx.restore();
       }
 
