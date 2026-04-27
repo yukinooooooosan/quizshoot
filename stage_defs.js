@@ -66,19 +66,19 @@ export const STAGE_DEFS = {
         type: 'normal',
         message: 'WAVE 1',
         quiz: { genres: ['くだもの', 'たべもの'], levels: [1], timerSec: 15 },
-        enemies: { cols: 5, rows: 3, speed: 0.35, descent: 0.05 },
+        enemies: { cols: 4, rows: 2, speed: 0.35, descent: 0.05 },
       },
       {
         type: 'normal',
         message: 'WAVE 2',
         quiz: { genres: ['いきもの'], levels: [1], timerSec: 15 },
-        enemies: { cols: 6, rows: 3, speed: 0.4, descent: 0.055 },
+        enemies: { cols: 5, rows: 2, speed: 0.4, descent: 0.055 },
       },
       {
         type: 'normal',
         message: 'WAVE 3',
         quiz: { genres: ['くらし', 'からだ'], levels: [1], timerSec: 14 },
-        enemies: { cols: 6, rows: 4, speed: 0.45, descent: 0.06 },
+        enemies: { cols: 5, rows: 3, speed: 0.45, descent: 0.06 },
       },
       {
         type: 'boss',
