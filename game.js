@@ -5,13 +5,16 @@ import { STAGE_DEFS } from './stage_defs.js';
 // ========== 定数 ==========
 const CW = 480;
 const CH = 360;
-const PLAYFIELD_BOTTOM_LIFT = 16;
-const DEFENSE_Y = CH - 50 - PLAYFIELD_BOTTOM_LIFT;
-const DANGER_Y = CH * 0.55;
+const PLAYER_BOTTOM_LIFT = 0;
+const PLAYER_Y = CH - 30 - PLAYER_BOTTOM_LIFT;
+const PLAYER_DEFENSE_GAP = 20;
+const DEFENSE_Y = PLAYER_Y - PLAYER_DEFENSE_GAP;
+const DEFENSE_BREACH_MARGIN = 5;
+const DANGER_ZONE_HEIGHT = 40;
+const DANGER_Y = DEFENSE_Y - DANGER_ZONE_HEIGHT;
 const DANGER_APPROACH_DESCENT_MULT = 1.65;
 const DANGER_ZONE_DESCENT_MULT = 0.35;
 const DEBUG_SHORTCUTS = true;
-const PLAYER_Y = CH - 30 - PLAYFIELD_BOTTOM_LIFT;
 const ENEMY_PIXEL = 4;
 const ENEMY_W = 28;
 const ENEMY_H = 28;
@@ -29,6 +32,7 @@ const COMBO_RANKS = [
 
 const SCORE_MULTIPLIER = { hit: 1.0, great: 1.5, perfect: 2.0, ace: 3.0 };
 const WRONG_ANSWER_DROP = 20;
+const DANGER_ATTACK_BONUS_BY_RANK = [5, 3, 2, 1];
 
 // ボスウェーブ定義テーブル
 // pattern: 'scramble(n)' = n個のボタンを？に隠す, 'blind(n)' = 問題文をn文字マスク
@@ -498,6 +502,7 @@ class Game {
     this.stageClearSubMessage = '';
     this.readyMsg = ''; this.readyMsgTimer = 0;
     this.bossAttackIncoming = false;
+    this.dangerBoostUsed = false;
     this.pauseTimeouts = [];
     this.pausedFromState = null;
 
@@ -642,6 +647,7 @@ class Game {
 
   _updatePauseButton() {
     const canPause = this.state === 'playing' || this.state === 'waveTransition' || this.state === 'paused';
+    document.getElementById('pause-row').classList.toggle('hidden', !canPause);
     this.pauseBtn.disabled = !canPause;
     this.pauseBtn.textContent = this.state === 'paused' ? '▶' : '⏸';
     this.pauseBtn.setAttribute('aria-label', this.state === 'paused' ? 'Resume' : 'Pause');
@@ -869,6 +875,10 @@ class Game {
     return this.descentSpeed * multiplier;
   }
 
+  _isInDangerZone() {
+    return this._getLowestEnemyY() >= DANGER_Y;
+  }
+
   // ========== ゲーム進行 ==========
   _startGame() {
     this.state = 'waveTransition';
@@ -1017,6 +1027,7 @@ class Game {
     const waveDef = this._getWaveDef();
     this.currentWaveDef = waveDef;
     this.enemies = [];
+    this.dangerBoostUsed = false;
     let totalW = 0;
 
     if (waveDef.type === 'boss') {
@@ -1169,10 +1180,15 @@ class Game {
     // 砲弾発射（マシンガン）
     const baseKillCount = currentRank.killCounts[grade];
     const hasBoss = this.enemies.some(e => e.alive && e.isBoss);
-    const killCount = hasBoss ? baseKillCount : baseKillCount * (isCharged ? 2 : 1);
-    const bulletPower = hasBoss && isCharged ? 2 : 1;
+    const dangerBoost = this._isInDangerZone() && !this.dangerBoostUsed;
+    const dangerAttackBonus = dangerBoost ? DANGER_ATTACK_BONUS_BY_RANK[this.weaponRankIndex] : 0;
+    const killCount = hasBoss
+      ? baseKillCount
+      : (baseKillCount + dangerAttackBonus) * (isCharged ? 2 : 1);
+    const bulletPower = (hasBoss && isCharged ? 2 : 1) + (hasBoss ? dangerAttackBonus : 0);
     const bulletSizeScale = isCharged ? (hasBoss ? 3 : 2) : 1;
     const targets = this._findTargets(killCount);
+    if (dangerBoost) this.dangerBoostUsed = true;
     if (isCharged) {
       this.chargeReady = false;
       this.chargeActive = false;
@@ -1203,7 +1219,7 @@ class Game {
     this.score += Math.floor(100 * this.combo * SCORE_MULTIPLIER[grade]);
 
     // タイミング結果表示
-    this.timingResult = { grade, weaponName: currentRank.name, killCount };
+    this.timingResult = { grade, weaponName: currentRank.name, killCount, dangerBoost };
     this.timingResultTimer = 45;
 
     this._updateUI();
@@ -1410,7 +1426,7 @@ class Game {
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const ey = e.isBoss ? this.formY + e.height : this.formY + e.row * (ENEMY_H + ENEMY_GAP_Y) + ENEMY_H;
-      if (ey >= DEFENSE_Y + 15) {
+      if (ey >= DEFENSE_Y + DEFENSE_BREACH_MARGIN) {
         this._startDying();
         return;
       }
@@ -1475,7 +1491,8 @@ class Game {
         const dangerRange = DEFENSE_Y - dangerStart;
         const dangerRatio = Math.max(0, Math.min(1, (lowestY - dangerStart) / dangerRange));
         if (dangerRatio > 0) {
-          ctx.fillStyle = `rgba(255, 0, 0, ${dangerRatio * 0.25})`;
+          const dangerAlpha = 0.1 + dangerRatio * 0.22;
+          ctx.fillStyle = `rgba(255, 0, 0, ${dangerAlpha})`;
           ctx.fillRect(-10, -10, CW + 20, CH + 20);
         }
       }
@@ -1608,6 +1625,23 @@ class Game {
         ctx.moveTo(28, -2);
         ctx.lineTo(14, -2);
         ctx.stroke();
+        ctx.restore();
+      }
+
+      if (this.state === 'playing' && this._isInDangerZone()) {
+        const bonus = DANGER_ATTACK_BONUS_BY_RANK[this.weaponRankIndex];
+        const canDangerBoost = bonus > 0 && !this.dangerBoostUsed;
+        const pulse = 0.58 + Math.sin(Date.now() / 70) * 0.38;
+        const y = PLAYER_Y + this.playerOffsetY - 18;
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.textAlign = 'center';
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#ff4757';
+        ctx.fillStyle = '#ff4757';
+        ctx.fillText(canDangerBoost ? 'DANGER BOOST' : 'DANGER ZONE', CW / 2 + this.playerOffsetX, y);
+        ctx.shadowBlur = 0;
         ctx.restore();
       }
 

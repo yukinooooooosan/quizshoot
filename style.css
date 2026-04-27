@@ -84,10 +84,14 @@ html, body {
   position: absolute;
   top: 40px;
   right: 10px;
-  z-index: 20;
+  z-index: 120;
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
+}
+
+#pause-row.hidden {
+  display: none;
 }
 
 #pause-btn {
