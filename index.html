@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>QuizShoot - クイズ × シューティング</title>
+  <meta name="description" content="スペースインベーダー風クイズゲーム。クイズに正解して敵を撃破せよ！">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <!-- ステータスバー -->
+    <div id="status-bar">
+      <span id="score">SCORE: 0</span>
+      <span id="wave">WAVE 1</span>
+      <span id="combo" class="hidden">COMBOx1</span>
+      <span id="weapon">🔫 LASER</span>
+    </div>
+    <div id="pause-row">
+      <button id="pause-btn" type="button" aria-label="Pause" disabled>⏸</button>
+    </div>
+
+    <!-- ゲームCanvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- クイズパネル -->
+    <div id="quiz-panel">
+      <div id="question-text">準備中...</div>
+      <div id="input-display">
+        <span class="char-slot" data-index="0"></span>
+        <span class="char-slot" data-index="1"></span>
+        <span class="char-slot" data-index="2"></span>
+      </div>
+      <div id="dpad">
+        <button class="dpad-btn" id="dpad-up" data-dir="up"></button>
+        <button class="dpad-btn" id="dpad-left" data-dir="left"></button>
+        <button class="dpad-btn" id="dpad-center" data-dir="center">✕</button>
+        <button class="dpad-btn" id="dpad-right" data-dir="right"></button>
+        <button class="dpad-btn" id="dpad-down" data-dir="down"></button>
+      </div>
+      <div id="timer-bar">
+        <div id="timer-fill"></div>
+        <div class="zone-line" id="zone-1"></div>
+        <div class="zone-line" id="zone-2"></div>
+        <div class="zone-line" id="zone-3"></div>
+      </div>
+    </div>
+
+    <!-- タイトルオーバーレイ -->
+    <div id="title-overlay" class="overlay">
+      <div class="overlay-content">
+        <div id="title-screen">
+          <h1 class="game-title">QUIZ<br>SHOOT</h1>
+          <p class="subtitle">クイズに正解して敵を撃破せよ！</p>
+          <p class="blink">PRESS BUTTON / TAP</p>
+        </div>
+        <div id="stage-select-screen" class="screen-hidden">
+          <div class="stage-select-title">SELECT STAGE</div>
+          <div id="stage-grid" aria-label="Stage Select"></div>
+          <button id="stage-confirm" type="button">
+            <span id="stage-selected-label">STAGE 01</span>
+            <span id="stage-selected-subtitle">くだもの秘密基地</span>
+            <span id="stage-selected-description">くだもの・たべもの中心の出撃訓練</span>
+            <span id="stage-selected-meta">WAVES: 5</span>
+            <span id="stage-selected-best">BEST SCORE: 0</span>
+          </button>
+          <p class="blink">SELECT STAGE / BUTTON OR TAP</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ゲームオーバーオーバーレイ -->
+    <div id="gameover-overlay" class="overlay hidden">
+      <div class="overlay-content">
+        <h2 id="result-title" class="gameover-title">GAME OVER</h2>
+        <p id="new-record" class="hidden">NEW RECORD!</p>
+        <p id="final-score">SCORE: 0</p>
+        <p id="final-hiscore">BEST SCORE: 0</p>
+        <p id="final-wave">WAVE: 1</p>
+        <p class="blink" style="margin-top:24px;">PRESS BUTTON / TAP TO RETRY</p>
+      </div>
+    </div>
+
+    <!-- ステージクリア白フラッシュオーバーレイ -->
+    <div id="flash-overlay"></div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
