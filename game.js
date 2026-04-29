@@ -1,6 +1,8 @@
 // game.js - メインゲームエンジン
 import { QuizManager } from './quiz.js';
 import { STAGE_DEFS } from './stage_defs.js';
+import { ENEMY_SPRITE_COUNT, drawEnemyMob, getMobIdByIndex } from './mob_sprites.js';
+import { drawBoss, getBossMainColor } from './boss_sprites.js';
 
 // ========== 定数 ==========
 const CW = 480;
@@ -14,8 +16,10 @@ const DANGER_ZONE_HEIGHT = 40;
 const DANGER_Y = DEFENSE_Y - DANGER_ZONE_HEIGHT;
 const DANGER_APPROACH_DESCENT_MULT = 1.65;
 const DANGER_ZONE_DESCENT_MULT = 0.35;
+const ENEMY_ANIM_SPEED_MIN = 1;
+const ENEMY_ANIM_SPEED_DANGER = 1.5;
+const ENEMY_ANIM_SPEED_DEFEAT = 3;
 const DEBUG_SHORTCUTS = true;
-const ENEMY_PIXEL = 4;
 const ENEMY_W = 28;
 const ENEMY_H = 28;
 const ENEMY_GAP_X = 10;
@@ -38,13 +42,13 @@ const DANGER_ATTACK_BONUS_BY_RANK = [5, 3, 2, 1];
 // pattern: 'scramble(n)' = n個のボタンを？に隠す, 'blind(n)' = 問題文をn文字マスク
 // design: 'fortress' | 'wing' | 'core'
 const BOSS_DEFS = [
-  { wave: 5,  hp: 30,  timerSec: 12, speed: 0.9, descent: 0.02, design: 'fortress', color: '#ff4757', pattern: ['scramble(1)'],              prob: 0.6 },
-  { wave: 10, hp: 50,  timerSec: 10, speed: 1.0, descent: 0.02, design: 'wing',     color: '#4d96ff', pattern: ['blind(2)'],                prob: 0.8 },
-  { wave: 15, hp: 70,  timerSec: 10, speed: 1.1, descent: 0.02, design: 'core',     color: '#cc65fe', pattern: ['scramble(2)'],             prob: 1.0 },
-  { wave: 20, hp: 100, timerSec: 8,  speed: 1.2, descent: 0.02, design: 'fortress', color: '#ffd93d', pattern: ['blind(3)'],                prob: 1.0 },
-  { wave: 25, hp: 130, timerSec: 8,  speed: 1.3, descent: 0.02, design: 'wing',     color: '#6bcb77', pattern: ['scramble(2)', 'blind(2)'], prob: 1.0 },
-  { wave: 30, hp: 160, timerSec: 8,  speed: 1.4, descent: 0.02, design: 'core',     color: '#ff6bff', pattern: ['marquee(4)'],              prob: 1.0 },
-  { wave: 35, hp: 200, timerSec: 8,  speed: 1.5, descent: 0.02, design: 'fortress', color: '#ff6b35', pattern: ['marquee(2)', 'scramble(2)'], prob: 1.0 },
+  { wave: 5,  hp: 30,  timerSec: 12, speed: 0.9, descent: 0.02, design: 'fortress', pattern: ['scramble(1)'],              prob: 0.6 },
+  { wave: 10, hp: 50,  timerSec: 10, speed: 1.0, descent: 0.02, design: 'wing',     pattern: ['blind(2)'],                prob: 0.8 },
+  { wave: 15, hp: 70,  timerSec: 10, speed: 1.1, descent: 0.02, design: 'core',     pattern: ['scramble(2)'],             prob: 1.0 },
+  { wave: 20, hp: 100, timerSec: 8,  speed: 1.2, descent: 0.02, design: 'fortress', pattern: ['blind(3)'],                prob: 1.0 },
+  { wave: 25, hp: 130, timerSec: 8,  speed: 1.3, descent: 0.02, design: 'wing',     pattern: ['scramble(2)', 'blind(2)'], prob: 1.0 },
+  { wave: 30, hp: 160, timerSec: 8,  speed: 1.4, descent: 0.02, design: 'core',     pattern: ['marquee(4)'],              prob: 1.0 },
+  { wave: 35, hp: 200, timerSec: 8,  speed: 1.5, descent: 0.02, design: 'fortress', pattern: ['marquee(2)', 'scramble(2)'], prob: 1.0 },
 ];
 
 function getBossDef(wave) {
@@ -86,7 +90,6 @@ function createLegacyWaveDef(wave) {
         width: def.width || 120,
         height: def.height || 80,
         design: def.design || 'fortress',
-        color: def.color || '#ff4757',
         speed: def.speed,
         descent: def.descent,
         pattern: def.pattern,
@@ -194,6 +197,7 @@ function resolveInfinityWaveDef(template, context) {
       rows: enemies.rows ?? Math.round(resolveCurve(enemies.rowsCurve, context)),
       speed: enemies.speed ?? resolveCurve(enemies.speedCurve, context),
       descent: enemies.descent ?? resolveCurve(enemies.descentCurve, context),
+      mobs: enemies.mobs,
     };
   }
 
@@ -207,7 +211,6 @@ function resolveInfinityWaveDef(template, context) {
       speed: boss.speed ?? resolveCurve(boss.speedCurve, context),
       descent: boss.descent ?? 0.02,
       design: boss.design || pickByIndex(boss.designs, context.bossIndex - 1) || 'fortress',
-      color: boss.color || pickByIndex(boss.colors, context.bossIndex - 1) || '#ff4757',
       pattern: boss.pattern || pattern?.pattern,
       patternProb: boss.patternProb ?? pattern?.patternProb ?? 1,
     };
@@ -243,18 +246,6 @@ function getAnswerResult(ratio) {
   if (ratio >= 1 / 3) return 'great';
   return 'hit';
 }
-
-// 敵のピクセルパターン
-const PATTERNS = [
-  [[0, 0, 0, 1, 0, 0, 0], [0, 0, 1, 1, 1, 0, 0], [0, 1, 1, 1, 1, 1, 0],
-  [1, 1, 0, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1], [0, 1, 0, 0, 0, 1, 0], [1, 0, 0, 0, 0, 0, 1]],
-  [[0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 1, 0, 0], [0, 1, 1, 1, 1, 1, 0],
-  [1, 1, 0, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 1], [0, 0, 1, 0, 1, 0, 0], [0, 1, 0, 0, 0, 1, 0]],
-  [[0, 0, 1, 1, 1, 0, 0], [0, 1, 1, 1, 1, 1, 0], [1, 1, 1, 1, 1, 1, 1],
-  [1, 0, 1, 0, 1, 0, 1], [1, 1, 1, 1, 1, 1, 1], [0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 1, 0, 0]],
-];
-
-const ENEMY_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#cc65fe'];
 
 // ========== ユーティリティ ==========
 function rand(min, max) { return Math.random() * (max - min) + min; }
@@ -481,6 +472,7 @@ class Game {
     this.enemies = [];
     this.bullets = [];
     this.particles = [];
+    this.frameCount = 0;
 
     this.formX = 0; this.formY = 0;
     this.formDir = 1; this.formSpeed = 0.3;
@@ -696,7 +688,68 @@ class Game {
   _getSelectableStages() {
     return Object.entries(STAGE_DEFS)
       .filter(([, stage]) => Number.isInteger(stage.slot))
+      .filter(([id]) => this._isStageUnlocked(id))
       .sort((a, b) => a[1].slot - b[1].slot);
+  }
+
+  _getStageEntries() {
+    return Object.entries(STAGE_DEFS)
+      .filter(([, stage]) => Number.isInteger(stage.slot))
+      .sort((a, b) => a[1].slot - b[1].slot);
+  }
+
+  _getStageNo(stageId) {
+    const match = /^s(\d{2})$/.exec(stageId);
+    return match ? Number(match[1]) : null;
+  }
+
+  _getStageIdByNo(stageNo) {
+    return `s${String(stageNo).padStart(2, '0')}`;
+  }
+
+  _isStageNoCleared(stageNo) {
+    const stageId = this._getStageIdByNo(stageNo);
+    return Boolean(STAGE_DEFS[stageId]) && this._isStageCleared(stageId);
+  }
+
+  _isInfinityUnlocked() {
+    for (let stageNo = 1; stageNo <= 24; stageNo++) {
+      const stageId = this._getStageIdByNo(stageNo);
+      if (!STAGE_DEFS[stageId] || !this._isStageCleared(stageId)) return false;
+    }
+    return true;
+  }
+
+  _isStageUnlocked(stageId) {
+    const stage = STAGE_DEFS[stageId];
+    if (!stage || !Number.isInteger(stage.slot)) return false;
+    if (stage.mode === 'infinity') return this._isInfinityUnlocked();
+
+    const stageNo = this._getStageNo(stageId);
+    if (!stageNo || stageNo < 1 || stageNo > 24) return false;
+    if (stageNo === 1) return true;
+
+    const blockStart = Math.floor((stageNo - 1) / 5) * 5 + 1;
+
+    if (blockStart === 21) {
+      if (stageNo === 21) return this._isStageNoCleared(20);
+      if (stageNo >= 22 && stageNo <= 24) return this._isStageNoCleared(21);
+      return false;
+    }
+
+    if (stageNo === blockStart) return this._isStageNoCleared(blockStart - 1);
+    if (stageNo >= blockStart + 1 && stageNo <= blockStart + 3) {
+      return this._isStageNoCleared(blockStart);
+    }
+    if (stageNo === blockStart + 4) {
+      let clearedCount = 0;
+      for (let no = blockStart; no <= blockStart + 3; no++) {
+        if (this._isStageNoCleared(no)) clearedCount++;
+      }
+      return clearedCount >= 2;
+    }
+
+    return false;
   }
 
   _getStageMeta(stage) {
@@ -736,7 +789,7 @@ class Game {
 
   _renderStageSelect() {
     const stagesBySlot = new Map(
-      this._getSelectableStages().map(([id, stage]) => [stage.slot, { id, stage }])
+      this._getStageEntries().map(([id, stage]) => [stage.slot, { id, stage }])
     );
     this.stageGridEl.replaceChildren();
 
@@ -747,6 +800,7 @@ class Game {
       btn.className = 'stage-cell';
 
       if (entry) {
+        const isUnlocked = this._isStageUnlocked(entry.id);
         const noEl = document.createElement('span');
         noEl.className = 'stage-cell-no';
         noEl.textContent = entry.stage.displayNo || String(slot).padStart(2, '0');
@@ -762,11 +816,16 @@ class Game {
 
         btn.dataset.stageId = entry.id;
         btn.setAttribute('aria-label', `${entry.stage.label} ${entry.stage.subtitle || ''}`.trim());
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          this._selectStage(entry.id);
-        });
+        if (isUnlocked) {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this._selectStage(entry.id);
+          });
+        } else {
+          btn.disabled = true;
+          btn.classList.add('locked');
+        }
       } else {
         btn.textContent = String(slot).padStart(2, '0');
         btn.disabled = true;
@@ -776,12 +835,17 @@ class Game {
       this.stageGridEl.appendChild(btn);
     }
 
+    if (!this._isStageUnlocked(this.selectedStageId)) {
+      const firstUnlocked = this._getSelectableStages()[0];
+      if (firstUnlocked) this.selectedStageId = firstUnlocked[0];
+    }
     this._selectStage(this.selectedStageId);
   }
 
   _selectStage(stageId) {
     const stage = STAGE_DEFS[stageId];
     if (!stage || !Number.isInteger(stage.slot)) return;
+    if (!this._isStageUnlocked(stageId)) return;
 
     this.selectedStageId = stageId;
     for (const btn of this.stageGridEl.querySelectorAll('.stage-cell')) {
@@ -836,6 +900,7 @@ class Game {
   _confirmStageSelection() {
     if (this.state !== 'stageSelect') return;
     if (!STAGE_DEFS[this.selectedStageId]) return;
+    if (!this._isStageUnlocked(this.selectedStageId)) return;
     this.stageId = this.selectedStageId;
     this._startGame();
   }
@@ -877,6 +942,12 @@ class Game {
 
   _isInDangerZone() {
     return this._getLowestEnemyY() >= DANGER_Y;
+  }
+
+  _getEnemyAnimationSpeed(bottomY) {
+    if (this.state === 'dying') return ENEMY_ANIM_SPEED_DEFEAT;
+    if (bottomY < DANGER_Y) return ENEMY_ANIM_SPEED_MIN;
+    return ENEMY_ANIM_SPEED_DANGER;
   }
 
   // ========== ゲーム進行 ==========
@@ -1041,7 +1112,7 @@ class Game {
         width,
         height,
         design: def.design || 'fortress',
-        color: def.color || '#ff4757',
+        color: getBossMainColor(def.design || 'fortress'),
         alive: true
       });
       totalW = width;
@@ -1051,12 +1122,13 @@ class Game {
       const def = waveDef.enemies || {};
       const cols = def.cols ?? Math.min(8, 5 + Math.floor(this.wave / 2));
       const rows = def.rows ?? Math.min(5, 3 + Math.floor(this.wave / 3));
+      const mobs = Array.isArray(def.mobs) && def.mobs.length > 0 ? def.mobs : null;
       for (let r = 0; r < rows; r++) {
+        const mobId = mobs ? mobs[r % mobs.length] : getMobIdByIndex(r);
         for (let c = 0; c < cols; c++) {
           this.enemies.push({
             isBoss: false, col: c, row: r,
-            type: r % PATTERNS.length,
-            color: ENEMY_COLORS[r % ENEMY_COLORS.length],
+            mobId,
             alive: true,
           });
         }
@@ -1310,6 +1382,7 @@ class Game {
   _update() {
     if (this.state === 'paused') return;
 
+    this.frameCount++;
     for (const s of this.stars) s.update();
     this.particles = this.particles.filter(p => p.life > 0);
     for (const p of this.particles) p.update();
@@ -1461,11 +1534,12 @@ class Game {
       ctx.setLineDash([]);
 
       // 敵
+      const enemyAnimationSpeed = this._getEnemyAnimationSpeed(this._getLowestEnemyY());
       for (const e of this.enemies) {
         if (!e.alive) continue;
         const x = e.isBoss ? this.formX : this.formX + e.col * (ENEMY_W + ENEMY_GAP_X);
         const y = e.isBoss ? this.formY : this.formY + e.row * (ENEMY_H + ENEMY_GAP_Y);
-        this._drawEnemy(ctx, e, x, y);
+        this._drawEnemy(ctx, e, x, y, enemyAnimationSpeed);
       }
 
       // 砲弾
@@ -1720,98 +1794,19 @@ class Game {
       for (let i = 0; i < 5; i++) {
         const x = CW / 2 + Math.sin(t + i * 1.2) * 100 - ENEMY_W / 2;
         const y = 80 + Math.cos(t * 0.7 + i) * 30;
-        this._drawEnemy(ctx, { type: i % 3, color: ENEMY_COLORS[i % ENEMY_COLORS.length] }, x, y);
+        this._drawEnemy(ctx, { mobId: getMobIdByIndex(i % ENEMY_SPRITE_COUNT) }, x, y);
       }
     }
 
     ctx.restore();
   }
 
-  _drawEnemy(ctx, enemy, x, y) {
-    ctx.save();
-    ctx.shadowBlur = 6; ctx.shadowColor = enemy.color;
-    ctx.fillStyle = enemy.color;
-
+  _drawEnemy(ctx, enemy, x, y, animationSpeed = ENEMY_ANIM_SPEED_MIN) {
     if (enemy.isBoss) {
-      this._drawBoss(ctx, enemy, x, y);
+      drawBoss(ctx, enemy, x, y, this.frameCount, animationSpeed);
     } else {
-      const pattern = PATTERNS[enemy.type];
-      for (let r = 0; r < pattern.length; r++) {
-        for (let c = 0; c < pattern[r].length; c++) {
-          if (pattern[r][c]) ctx.fillRect(x + c * ENEMY_PIXEL, y + r * ENEMY_PIXEL, ENEMY_PIXEL, ENEMY_PIXEL);
-        }
-      }
+      drawEnemyMob(ctx, enemy, x, y, this.frameCount, animationSpeed);
     }
-    ctx.restore();
-  }
-
-  _drawBoss(ctx, enemy, x, y) {
-    const design = enemy.design || 'fortress';
-    if (design === 'wing') this._drawBossWing(ctx, enemy, x, y);
-    else if (design === 'core') this._drawBossCore(ctx, enemy, x, y);
-    else this._drawBossFortress(ctx, enemy, x, y);
-    this._drawBossHp(ctx, enemy, x, y);
-  }
-
-  _drawBossFortress(ctx, enemy, x, y) {
-    const w = enemy.width;
-    const h = enemy.height;
-    ctx.fillStyle = enemy.color;
-    ctx.fillRect(x + 10, y, w - 20, h - 20);
-    ctx.fillRect(x, y + 20, w, h - 40);
-    ctx.fillRect(x + 18, y + h - 18, 18, 18);
-    ctx.fillRect(x + w - 36, y + h - 18, 18, 18);
-
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(x + 30, y + 30, 20, 20);
-    ctx.fillRect(x + w - 50, y + 30, 20, 20);
-    ctx.fillRect(x + w / 2 - 8, y + 10, 16, 12);
-  }
-
-  _drawBossWing(ctx, enemy, x, y) {
-    const w = enemy.width;
-    const h = enemy.height;
-    ctx.fillStyle = enemy.color;
-    ctx.fillRect(x + w / 2 - 18, y + 8, 36, h - 16);
-    ctx.fillRect(x + 18, y + 26, w - 36, 28);
-    ctx.fillRect(x, y + 34, 34, 16);
-    ctx.fillRect(x + w - 34, y + 34, 34, 16);
-    ctx.fillRect(x + 12, y + 18, 28, 12);
-    ctx.fillRect(x + w - 40, y + 18, 28, 12);
-    ctx.fillRect(x + 24, y + 52, 24, 12);
-    ctx.fillRect(x + w - 48, y + 52, 24, 12);
-
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(x + w / 2 - 7, y + 24, 14, 14);
-    ctx.fillRect(x + 27, y + 38, 12, 8);
-    ctx.fillRect(x + w - 39, y + 38, 12, 8);
-  }
-
-  _drawBossCore(ctx, enemy, x, y) {
-    const w = enemy.width;
-    const h = enemy.height;
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    ctx.fillStyle = enemy.color;
-    ctx.fillRect(cx - 26, y + 8, 52, h - 16);
-    ctx.fillRect(x + 20, cy - 14, w - 40, 28);
-    ctx.fillRect(x + 8, cy - 6, 18, 12);
-    ctx.fillRect(x + w - 26, cy - 6, 18, 12);
-    ctx.fillRect(cx - 8, y, 16, 16);
-    ctx.fillRect(cx - 8, y + h - 16, 16, 16);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(cx - 10, cy - 10, 20, 20);
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(cx - 5, cy - 5, 10, 10);
-  }
-
-  _drawBossHp(ctx, enemy, x, y) {
-    const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-    ctx.fillRect(x, y - 10, enemy.width, 6);
-    ctx.fillStyle = '#00ff88';
-    ctx.fillRect(x, y - 10, enemy.width * hpRatio, 6);
   }
 
   _drawPlayer(ctx, options = {}) {

@@ -33,6 +33,7 @@
 //   enemies: {
 //     cols: 5,
 //     rows: 3,
+//     mobs: ['scout', 'guard', 'drone'],
 //     speed: 0.35,
 //     descent: 0.05,
 //   },
@@ -43,7 +44,6 @@
 //     speed: 0.9,
 //     descent: 0.02,
 //     design: 'fortress' | 'wing' | 'core',
-//     color: '#ff4757',
 //     pattern: ['scramble(1)'],
 //     patternProb: 0.6,
 //   },
@@ -89,25 +89,25 @@ export const INFINITY_STAGE_DEF = {
       type: 'normal',
       message: 'WAVE 1',
       quiz: { genres: ['くだもの', 'たべもの'], levels: [1], timerSec: 15 },
-      enemies: { cols: 4, rows: 2, speed: 0.25, descent: 0.02 },
+      enemies: { cols: 4, rows: 2, mobs: ['scout'], speed: 0.25, descent: 0.02 },
     },
     2: {
       type: 'normal',
       message: 'WAVE 2',
       quiz: { genres: ['いきもの'], levels: [1], timerSec: 15 },
-      enemies: { cols: 5, rows: 2, speed: 0.3, descent: 0.03 },
+      enemies: { cols: 5, rows: 2, mobs: ['scout', 'drone'], speed: 0.3, descent: 0.03 },
     },
     3: {
       type: 'normal',
       message: 'WAVE 3',
       quiz: { genres: ['からだ', 'くらし'], levels: [1], timerSec: 14 },
-      enemies: { cols: 6, rows: 3, speed: 0.35, descent: 0.04 },
+      enemies: { cols: 6, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.35, descent: 0.04 },
     },
     4: {
       type: 'normal',
       message: 'WAVE 4',
       quiz: { genres: ['ちめい'], levels: [1], timerSec: 14 },
-      enemies: { cols: 6, rows: 4, speed: 0.4, descent: 0.05 },
+      enemies: { cols: 6, rows: 4, mobs: ['scout', 'guard', 'drone', 'guard'], speed: 0.4, descent: 0.05 },
     },
   },
 
@@ -120,6 +120,7 @@ export const INFINITY_STAGE_DEF = {
       enemies: {
         cols: 3,
         rows: 1,
+        mobs: ['drone'],
         speed: 0.35,
         descent: 0.04,
       },
@@ -137,7 +138,6 @@ export const INFINITY_STAGE_DEF = {
         width: 120,
         height: 80,
         designs: ['fortress', 'wing', 'core'],
-        colors: ['#ff4757', '#4d96ff', '#cc65fe', '#ffd93d', '#6bcb77'],
         patterns: [
           { minBoss: 1, pattern: ['scramble(1)'], patternProb: 0.6 },
           { minBoss: 2, pattern: ['blind(2)'], patternProb: 0.8 },
@@ -156,6 +156,7 @@ export const INFINITY_STAGE_DEF = {
       enemies: {
         colsCurve: { type: 'step', base: 6, every: 4, add: 1, max: 8 },
         rowsCurve: { type: 'step', base: 3, every: 6, add: 1, max: 5 },
+        mobs: ['drone', 'guard', 'drone'],
         speedCurve: { type: 'linear', base: 0.4, perWave: 0.04, max: 1.4 },
         descentCurve: { type: 'linear', base: 0.05, perWave: 0.008, max: 0.18 },
       },
@@ -185,6 +186,7 @@ export const INFINITY_STAGE_DEF = {
     enemies: {
       colsCurve: { type: 'step', base: 5, every: 2, add: 1, max: 8 },
       rowsCurve: { type: 'step', base: 3, every: 3, add: 1, max: 5 },
+      mobs: ['scout', 'guard', 'drone'],
       speedCurve: { type: 'linear', base: 0.3, perWave: 0.05 },
       descentCurve: { type: 'linear', base: 0.05, perWave: 0.01 },
     },
