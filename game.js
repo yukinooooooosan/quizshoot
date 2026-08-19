@@ -40,7 +40,7 @@ const DANGER_ATTACK_BONUS_BY_RANK = [5, 3, 2, 1];
 
 // ボスウェーブ定義テーブル
 // pattern: 'scramble(n)' = n個のボタンを？に隠す, 'blind(n)' = 問題文をn文字マスク
-// design: 'fortress' | 'wing' | 'core'
+// design: 'fortress' | 'wing' | 'core' | 'face' | 'skull'
 const BOSS_DEFS = [
   { wave: 5,  hp: 30,  timerSec: 12, speed: 0.9, descent: 0.02, design: 'fortress', pattern: ['scramble(1)'],              prob: 0.6 },
   { wave: 10, hp: 50,  timerSec: 10, speed: 1.0, descent: 0.02, design: 'wing',     pattern: ['blind(2)'],                prob: 0.8 },
@@ -66,14 +66,15 @@ function getLegacyTimerSec(wave) {
   return 8;
 }
 
-function getLegacyQuestionLevelMax(wave) {
-  return Math.min(3, Math.floor((wave - 1) / 5) + 1);
+function getLegacyQuestionLevels(wave) {
+  const maxLevel = Math.min(3, Math.floor((wave - 1) / 5) + 1);
+  return Array.from({ length: maxLevel }, (_, index) => index + 1);
 }
 
 function createLegacyWaveDef(wave) {
   const quiz = {
     genres: ['mixed'],
-    levelMax: getLegacyQuestionLevelMax(wave),
+    levels: getLegacyQuestionLevels(wave),
     timerSec: getLegacyTimerSec(wave),
   };
 
@@ -160,10 +161,10 @@ function formatWaveMessage(message, wave) {
 }
 
 function getLevelsForWave(quiz = {}, wave) {
-  if (Array.isArray(quiz.levels)) return quiz.levels;
+  if (Array.isArray(quiz.levels) && quiz.levels.length > 0) return quiz.levels;
   const levelsByWave = quiz.levelsByWave || [];
   const matched = levelsByWave.find(item => wave <= item.maxWave);
-  return matched?.levels || quiz.levels;
+  return Array.isArray(matched?.levels) && matched.levels.length > 0 ? matched.levels : [1];
 }
 
 function pickByIndex(items, index) {
@@ -466,8 +467,6 @@ class Game {
     this.stageId = 's01';
     this.selectedStageId = this.stageId;
     this.currentWaveDef = null;
-    this.maxQuestionLevel = 1;
-
     this.stars = Array.from({ length: 60 }, () => new Star());
     this.enemies = [];
     this.bullets = [];
@@ -494,6 +493,9 @@ class Game {
     this.stageClearSubMessage = '';
     this.readyMsg = ''; this.readyMsgTimer = 0;
     this.bossAttackIncoming = false;
+    this.centerShot = null;
+    this.dodgeTimer = 0;
+    this.dodgeTimerMax = 30;
     this.dangerBoostUsed = false;
     this.pauseTimeouts = [];
     this.pausedFromState = null;
@@ -518,8 +520,6 @@ class Game {
     this.stageSelectScreen = document.getElementById('stage-select-screen');
     this.stageGridEl = document.getElementById('stage-grid');
     this.stageConfirmBtn = document.getElementById('stage-confirm');
-    this.stageSelectedLabelEl = document.getElementById('stage-selected-label');
-    this.stageSelectedSubtitleEl = document.getElementById('stage-selected-subtitle');
     this.stageSelectedDescriptionEl = document.getElementById('stage-selected-description');
     this.stageSelectedMetaEl = document.getElementById('stage-selected-meta');
     this.stageSelectedBestEl = document.getElementById('stage-selected-best');
@@ -534,6 +534,12 @@ class Game {
       onWrong: () => this._onWrong(),
       onTimeUp: () => this._onWrong(),
       onInput: (dir) => this._onPlayerInput(dir),
+      onAnswerResolved: (correct, gaugeRatio) => {
+        if (!correct || getAnswerResult(gaugeRatio) === 'miss' || !this.centerShot) return;
+        this.centerShot = null;
+        this.powerUpMsg = 'BLOCK!';
+        this.powerUpTimer = 45;
+      },
     });
 
     this._bindEvents();
@@ -686,70 +692,21 @@ class Game {
   }
 
   _getSelectableStages() {
-    return Object.entries(STAGE_DEFS)
-      .filter(([, stage]) => Number.isInteger(stage.slot))
-      .filter(([id]) => this._isStageUnlocked(id))
-      .sort((a, b) => a[1].slot - b[1].slot);
+    return this._getStageEntries()
+      .filter(([id]) => this._isStageUnlocked(id));
   }
 
   _getStageEntries() {
     return Object.entries(STAGE_DEFS)
-      .filter(([, stage]) => Number.isInteger(stage.slot))
+      .filter(([, stage]) => stage.selectable === true && Number.isInteger(stage.slot))
       .sort((a, b) => a[1].slot - b[1].slot);
-  }
-
-  _getStageNo(stageId) {
-    const match = /^s(\d{2})$/.exec(stageId);
-    return match ? Number(match[1]) : null;
-  }
-
-  _getStageIdByNo(stageNo) {
-    return `s${String(stageNo).padStart(2, '0')}`;
-  }
-
-  _isStageNoCleared(stageNo) {
-    const stageId = this._getStageIdByNo(stageNo);
-    return Boolean(STAGE_DEFS[stageId]) && this._isStageCleared(stageId);
-  }
-
-  _isInfinityUnlocked() {
-    for (let stageNo = 1; stageNo <= 24; stageNo++) {
-      const stageId = this._getStageIdByNo(stageNo);
-      if (!STAGE_DEFS[stageId] || !this._isStageCleared(stageId)) return false;
-    }
-    return true;
   }
 
   _isStageUnlocked(stageId) {
     const stage = STAGE_DEFS[stageId];
-    if (!stage || !Number.isInteger(stage.slot)) return false;
-    if (stage.mode === 'infinity') return this._isInfinityUnlocked();
-
-    const stageNo = this._getStageNo(stageId);
-    if (!stageNo || stageNo < 1 || stageNo > 24) return false;
-    if (stageNo === 1) return true;
-
-    const blockStart = Math.floor((stageNo - 1) / 5) * 5 + 1;
-
-    if (blockStart === 21) {
-      if (stageNo === 21) return this._isStageNoCleared(20);
-      if (stageNo >= 22 && stageNo <= 24) return this._isStageNoCleared(21);
-      return false;
-    }
-
-    if (stageNo === blockStart) return this._isStageNoCleared(blockStart - 1);
-    if (stageNo >= blockStart + 1 && stageNo <= blockStart + 3) {
-      return this._isStageNoCleared(blockStart);
-    }
-    if (stageNo === blockStart + 4) {
-      let clearedCount = 0;
-      for (let no = blockStart; no <= blockStart + 3; no++) {
-        if (this._isStageNoCleared(no)) clearedCount++;
-      }
-      return clearedCount >= 2;
-    }
-
-    return false;
+    if (!stage || stage.selectable !== true || !Number.isInteger(stage.slot)) return false;
+    if (!stage.unlockAfter) return true;
+    return this._isStageCleared(stage.unlockAfter);
   }
 
   _getStageMeta(stage) {
@@ -788,25 +745,54 @@ class Game {
   }
 
   _renderStageSelect() {
-    const stagesBySlot = new Map(
-      this._getStageEntries().map(([id, stage]) => [stage.slot, { id, stage }])
-    );
     this.stageGridEl.replaceChildren();
 
-    for (let slot = 1; slot <= 25; slot++) {
-      const entry = stagesBySlot.get(slot);
+    for (const [stageId, stage] of this._getStageEntries()) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'stage-cell';
 
-      if (entry) {
-        const isUnlocked = this._isStageUnlocked(entry.id);
+      const isUnlocked = this._isStageUnlocked(stageId);
+      const isHiddenSecret = stage.hiddenUntilUnlocked && !isUnlocked;
+      const isConcealed = !isUnlocked && !isHiddenSecret;
+
+      if (isHiddenSecret) {
+        btn.disabled = true;
+        btn.classList.add('locked', 'secret');
+        btn.setAttribute('aria-label', '未解放のシークレットステージ');
+      } else if (isConcealed) {
+        const mainEl = document.createElement('span');
+        mainEl.className = 'stage-cell-main';
+
         const noEl = document.createElement('span');
         noEl.className = 'stage-cell-no';
-        noEl.textContent = entry.stage.displayNo || String(slot).padStart(2, '0');
-        btn.appendChild(noEl);
+        noEl.textContent = stage.displayNo || String(stage.slot).padStart(2, '0');
+        mainEl.appendChild(noEl);
 
-        if (entry.stage.mode !== 'infinity' && this._isStageCleared(entry.id)) {
+        const nameEl = document.createElement('span');
+        nameEl.className = 'stage-cell-name stage-cell-name-concealed';
+        nameEl.textContent = '???';
+        mainEl.appendChild(nameEl);
+        btn.appendChild(mainEl);
+        btn.disabled = true;
+        btn.classList.add('locked', 'concealed');
+        btn.setAttribute('aria-label', `Stage ${stage.displayNo || stage.slot} 未解放`);
+      } else {
+        const mainEl = document.createElement('span');
+        mainEl.className = 'stage-cell-main';
+
+        const noEl = document.createElement('span');
+        noEl.className = 'stage-cell-no';
+        noEl.textContent = stage.displayNo || String(stage.slot).padStart(2, '0');
+        mainEl.appendChild(noEl);
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'stage-cell-name';
+        nameEl.textContent = stage.subtitle || stage.label || stageId;
+        mainEl.appendChild(nameEl);
+        btn.appendChild(mainEl);
+
+        if (stage.mode !== 'infinity' && this._isStageCleared(stageId)) {
           const clearEl = document.createElement('span');
           clearEl.className = 'stage-cell-clear';
           clearEl.textContent = 'CLEAR';
@@ -814,22 +800,13 @@ class Game {
           btn.classList.add('cleared');
         }
 
-        btn.dataset.stageId = entry.id;
-        btn.setAttribute('aria-label', `${entry.stage.label} ${entry.stage.subtitle || ''}`.trim());
-        if (isUnlocked) {
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this._selectStage(entry.id);
-          });
-        } else {
-          btn.disabled = true;
-          btn.classList.add('locked');
-        }
-      } else {
-        btn.textContent = String(slot).padStart(2, '0');
-        btn.disabled = true;
-        btn.classList.add('empty');
+        btn.dataset.stageId = stageId;
+        btn.setAttribute('aria-label', `${stage.label} ${stage.subtitle || ''}`.trim());
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this._selectStage(stageId);
+        });
       }
 
       this.stageGridEl.appendChild(btn);
@@ -852,8 +829,6 @@ class Game {
       btn.classList.toggle('selected', btn.dataset.stageId === stageId);
     }
 
-    this.stageSelectedLabelEl.textContent = stage.label || stageId;
-    this.stageSelectedSubtitleEl.textContent = stage.subtitle || '';
     this.stageSelectedDescriptionEl.textContent = stage.description || '';
     this.stageSelectedMetaEl.textContent = this._getStageMeta(stage);
     this.stageSelectedBestEl.textContent = `BEST SCORE: ${this._getStageHiScore(stageId)}`;
@@ -871,20 +846,10 @@ class Game {
     const current = STAGE_DEFS[this.selectedStageId];
     if (!current || selectable.length === 0) return;
 
-    const deltaByKey = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -5, ArrowDown: 5 };
-    const delta = deltaByKey[key] || 0;
-    const slots = selectable.map(([, stage]) => stage.slot);
-    const currentSlot = current.slot;
-    const targetSlot = currentSlot + delta;
-    let next = selectable.find(([, stage]) => stage.slot === targetSlot);
-
-    if (!next) {
-      const currentIndex = slots.indexOf(currentSlot);
-      const fallbackIndex = key === 'ArrowLeft' || key === 'ArrowUp'
-        ? Math.max(0, currentIndex - 1)
-        : Math.min(selectable.length - 1, currentIndex + 1);
-      next = selectable[fallbackIndex];
-    }
+    const currentIndex = selectable.findIndex(([id]) => id === this.selectedStageId);
+    const direction = key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1;
+    const nextIndex = Math.max(0, Math.min(selectable.length - 1, currentIndex + direction));
+    const next = selectable[nextIndex];
 
     if (next) this._selectStage(next[0]);
   }
@@ -956,8 +921,6 @@ class Game {
     this.pausedFromState = null;
     this._clearGameTimeouts();
     this.score = 0; this.combo = 0; this.weaponRankIndex = 0; this.comboSinceRankUp = 0; this.wave = 1;
-    this.maxQuestionLevel = 1;
-    this.quiz.setMaxQuestionLevel(this.maxQuestionLevel);
     this.bullets = []; this.particles = []; this.dyingTimer = 0; this.bossAttackIncoming = false;
     this.stageStartTime = performance.now();
     this.stageClearTimer = 0;
@@ -1001,6 +964,8 @@ class Game {
     this.dyingTimer = 90;
     this.quiz.stop();
     this.bullets = [];
+    this.centerShot = null;
+    this.dodgeTimer = 0;
     this._explode(CW / 2, PLAYER_Y, '#00ff88', 2.5);
     this._explode(CW / 2, PLAYER_Y, '#ff6b35', 2);
     this.shakeTimer = 30; this.shakeIntensity = 12;
@@ -1058,6 +1023,8 @@ class Game {
     this._clearChargeEffects();
     this.quiz.stop();
     this.bullets = [];
+    this.centerShot = null;
+    this.dodgeTimer = 0;
     this.state = 'stageClear';
     this.stageClearTimer = 0;
     this.stageClearPlayerY = PLAYER_Y;
@@ -1112,6 +1079,8 @@ class Game {
         width,
         height,
         design: def.design || 'fortress',
+        knockbackPerDamage: def.knockbackPerDamage ?? 0,
+        centerShot: def.centerShot || null,
         color: getBossMainColor(def.design || 'fortress'),
         alive: true
       });
@@ -1140,6 +1109,9 @@ class Game {
 
     this.formX = (CW - totalW) / 2;
     this.formY = 20;
+    this.centerShot = null;
+    this.dodgeTimer = 0;
+    this.dodgeTimerMax = 30;
     this.formDir = 1;
     this.waveMsg = this._getWaveMessage(waveDef);
     this.waveMsgTimer = 90;
@@ -1161,14 +1133,6 @@ class Game {
   }
 
   _clearWave() {
-    const waveDef = this.currentWaveDef || this._getWaveDef();
-    const stage = this._getStageDef();
-    if (stage.mode === 'infinity' && waveDef.type === 'boss' && this.maxQuestionLevel < 3) {
-      this.maxQuestionLevel++;
-      this.quiz.setMaxQuestionLevel(this.maxQuestionLevel);
-      this.powerUpMsg = `LEVEL ${this.maxQuestionLevel} QUESTIONS UNLOCKED`;
-      this.powerUpTimer = 90;
-    }
     if (this._isStageComplete()) {
       this._startStageClear();
       return;
@@ -1182,7 +1146,7 @@ class Game {
     this.quiz.setTimerForWave(this.wave);
     this.quiz.setQuestionFilter(waveDef.quiz || {
       genres: ['mixed'],
-      levelMax: this.maxQuestionLevel,
+      levels: [1],
       timerSec: this.quiz.timerMax,
     });
     this.quiz.pendingBossPattern = this._calcPattern(); // Q1のパターン（インジケーターは出さない）
@@ -1212,6 +1176,7 @@ class Game {
       this.state = 'playing';
       this.readyMsg = '';
       this.waveMsgTimer = 0;
+      this._startCenterShotForQuestion();
       this._applyNextPattern();
       this._updatePauseButton();
     }, 2700);
@@ -1322,6 +1287,7 @@ class Game {
     this._setGameTimeout(() => {
       if (this.state !== 'playing') return;
       this.quiz.showQuestion();
+      this._startCenterShotForQuestion();
       this._applyNextPattern();
     }, baseDelay);
   }
@@ -1330,15 +1296,194 @@ class Game {
     const waveDef = this.currentWaveDef || this._getWaveDef();
     if (waveDef.type !== 'boss') return null;
     const boss = waveDef.boss || {};
-    if (!boss.pattern) return null;
+    const patternCycle = Array.isArray(boss.patternCycle) ? boss.patternCycle : null;
+    let configuredPattern = patternCycle?.length > 0
+      ? patternCycle[this.quiz.questionsShown % patternCycle.length]
+      : boss.pattern;
+    const nextQuestionNumber = this.quiz.questionsShown + 1;
+    const centerShotEvery = Math.max(1, boss.centerShot?.everyQuestions ?? 0);
+    const latePattern = boss.centerShot?.latePattern;
+    if (
+      latePattern
+      && nextQuestionNumber >= latePattern.fromQuestion
+      && nextQuestionNumber % centerShotEvery === 0
+    ) {
+      configuredPattern = latePattern.pattern;
+    }
+    if (!Array.isArray(configuredPattern) || configuredPattern.length === 0) return null;
     const patternProb = boss.patternProb ?? 1;
-    return Math.random() < patternProb ? boss.pattern : null;
+    if (Math.random() >= patternProb) return null;
+
+    const pattern = [...configuredPattern];
+    if (boss.blindGrowth) {
+      const base = boss.blindGrowth.base ?? 1;
+      const every = Math.max(1, boss.blindGrowth.every ?? 2);
+      const blindCount = base + Math.floor(this.quiz.questionsShown / every);
+      return pattern.map(entry => entry.startsWith('blind') ? `blind(${blindCount})` : entry);
+    }
+    return pattern;
   }
 
   _applyNextPattern() {
     const pattern = this._calcPattern();
     this.quiz.pendingBossPattern = pattern;
     this.bossAttackIncoming = pattern;
+  }
+
+  _getCenterShotBoss() {
+    return this.enemies.find(enemy => enemy.alive && enemy.isBoss && enemy.centerShot) || null;
+  }
+
+  _activateDodge() {
+    const boss = this._getCenterShotBoss();
+    if (!boss) return;
+    this.dodgeTimerMax = boss.centerShot.dodgeFrames ?? 30;
+    this.dodgeTimer = this.dodgeTimerMax;
+  }
+
+  _startCenterShotForQuestion() {
+    const boss = this._getCenterShotBoss();
+    if (!boss || this.centerShot) return;
+    const everyQuestions = Math.max(1, boss.centerShot.everyQuestions ?? 2);
+    if (this.quiz.questionsShown % everyQuestions !== 0) return;
+
+    this.centerShot = {
+      phase: 'warning',
+      timer: boss.centerShot.warningFrames ?? 60,
+      travelFrames: Math.max(1, boss.centerShot.travelFrames ?? 45),
+      dodgeFrames: Math.max(1, boss.centerShot.dodgeFrames ?? 30),
+      trail: [],
+    };
+  }
+
+  _updateCenterShot() {
+    const attack = this.centerShot;
+    if (!attack) return;
+    const boss = this._getCenterShotBoss();
+    if (!boss) {
+      this.centerShot = null;
+      return;
+    }
+
+    if (attack.phase === 'warning') {
+      attack.timer--;
+      if (attack.timer <= 0) {
+        attack.phase = 'shot';
+        attack.x = this.formX + boss.width / 2;
+        attack.y = this.formY + boss.height * 0.72;
+        attack.framesLeft = attack.travelFrames;
+        attack.vx = (CW / 2 - attack.x) / attack.travelFrames;
+        attack.vy = (PLAYER_Y - attack.y) / attack.travelFrames;
+      }
+      return;
+    }
+
+    attack.trail.push({ x: attack.x, y: attack.y });
+    if (attack.trail.length > 10) attack.trail.shift();
+    attack.x += attack.vx;
+    attack.y += attack.vy;
+    attack.framesLeft--;
+    if (attack.framesLeft > 0) return;
+
+    const playerX = CW / 2 + this.playerOffsetX;
+    const playerY = PLAYER_Y + this.playerOffsetY;
+    if (this.dodgeTimer > 0) {
+      this.chargeReady = true;
+      this.chargeActive = true;
+      this.powerUpMsg = 'DODGE! ▸ CHARGE READY';
+      this.powerUpTimer = 60;
+      this._explode(playerX, playerY, '#00e5ff', 0.8);
+    } else {
+      this.centerShot = null;
+      this.dodgeTimer = 0;
+      this._startDying();
+      return;
+    }
+    this.dodgeTimer = 0;
+    this.centerShot = null;
+  }
+
+  _drawCenterShot(ctx) {
+    const attack = this.centerShot;
+    if (!attack) return;
+
+    ctx.save();
+    if (attack.phase === 'warning') {
+      const boss = this._getCenterShotBoss();
+      if (!boss) {
+        ctx.restore();
+        return;
+      }
+      const pulse = 0.55 + Math.sin(this.frameCount * 0.35) * 0.35;
+      const startX = this.formX + boss.width / 2;
+      const startY = this.formY + boss.height * 0.65;
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#ff315e';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(CW / 2, PLAYER_Y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,49,94,0.12)';
+      ctx.fillRect(CW / 2 - 22, startY, 44, PLAYER_Y - startY + 18);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(CW / 2, PLAYER_Y, 24 + Math.sin(this.frameCount * 0.25) * 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ff6685';
+      ctx.font = '12px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('CENTER SHOT', CW / 2, DEFENSE_Y - 40);
+      ctx.fillStyle = '#ffd93d';
+      ctx.fillText('MISS = GAME OVER', CW / 2, DEFENSE_Y - 18);
+    } else {
+      for (let i = 0; i < attack.trail.length; i++) {
+        const point = attack.trail[i];
+        ctx.globalAlpha = (i + 1) / attack.trail.length * 0.45;
+        ctx.fillStyle = '#ff315e';
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 3 + i * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 22;
+      ctx.shadowColor = '#ff315e';
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(attack.x, attack.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ff315e';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      if (attack.framesLeft <= attack.dodgeFrames) {
+        const dodgePulse = 0.7 + Math.sin(this.frameCount * 0.55) * 0.3;
+        ctx.globalAlpha = dodgePulse;
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = '#00e5ff';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '12px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('◀ DODGE NOW! ▶', CW / 2, DEFENSE_Y - 24);
+      }
+    }
+    ctx.restore();
+  }
+
+  _drawDodgeState(ctx) {
+    if (this.dodgeTimer <= 0) return;
+    const ratio = this.dodgeTimer / this.dodgeTimerMax;
+    ctx.save();
+    ctx.globalAlpha = 0.25 + ratio * 0.5;
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(CW / 2 + this.playerOffsetX, PLAYER_Y + this.playerOffsetY, 24 + (1 - ratio) * 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // ========== UI更新 ==========
@@ -1448,6 +1593,7 @@ class Game {
     if (this.powerUpTimer > 0) this.powerUpTimer--;
     if (this.timingResultTimer > 0) this.timingResultTimer--;
     if (this.chargeFlashTimer > 0) this.chargeFlashTimer--;
+    if (this.dodgeTimer > 0) this.dodgeTimer--;
     // 敵の移動
     const aliveEnemies = this.enemies.filter(e => e.alive);
     if (aliveEnemies.length > 0) {
@@ -1463,6 +1609,7 @@ class Game {
     }
     this.formX += this.formSpeed * this.formDir;
     this.formY += this._getCurrentDescentSpeed();
+    this._updateCenterShot();
 
     // 砲弾 & 衝突判定
     for (const b of this.bullets) {
@@ -1477,7 +1624,11 @@ class Game {
 
         if (Math.abs(b.x - ex) < hitDistX && Math.abs(b.y - ey) < hitDistY) {
           if (e.isBoss) {
-            e.hp -= b.rank * b.power; // 武器のランクが高いほどボスに大ダメージ
+            const damage = b.rank * b.power;
+            e.hp -= damage; // 武器のランクが高いほどボスに大ダメージ
+            if (e.knockbackPerDamage > 0) {
+              this.formY = Math.max(20, this.formY - damage * e.knockbackPerDamage);
+            }
             if (e.hp <= 0) e.alive = false;
           } else {
             e.alive = false;
@@ -1544,6 +1695,7 @@ class Game {
 
       // 砲弾
       for (const b of this.bullets) b.draw(ctx);
+      this._drawCenterShot(ctx);
       // 自機（dying中は爆発済みなので非表示）
       if (this.state === 'stageClear') {
         const boostScale = this.stageClearTimer <= 30
@@ -1554,6 +1706,7 @@ class Game {
         this._drawPlayer(ctx, { y: this.stageClearPlayerY, boostScale });
       } else if (this.state !== 'dying') {
         this._drawPlayer(ctx);
+        this._drawDodgeState(ctx);
       }
       // パーティクル
       for (const p of this.particles) p.draw(ctx);
@@ -1988,10 +2141,12 @@ class Game {
       case 'right':
         this.playerTargetX = CW / 2 - 20;
         this.playerReturnTimer = 12;
+        this._activateDodge();
         break;
       case 'left':
         this.playerTargetX = -(CW / 2 - 20);
         this.playerReturnTimer = 12;
+        this._activateDodge();
         break;
       case 'up':
         this.playerTargetY = -25;

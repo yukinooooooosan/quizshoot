@@ -5,14 +5,16 @@
 - `stage_defs.js` に `s01` と `infinity` を登録済み。
 - `infinity_stage_def.js` を追加済み。
 - `game.js` は `exactWaves > rules > defaultWave` とカーブ定義を解釈できる。
-- 固定Stageの`s01`は全5wave、クリア時に `STAGE 01 CLEAR! / FRUIT BASE` を表示する。
+- 固定Stageの`s01`は全3wave、クリア時に `STAGE 01 CLEAR! / MOGUMOGU BASE` を表示する。
 - 現在の起動stageは `game.js` の `stageId = 's01'` 固定。
 
 ## 完了
 
 - ステージ選択UIの基本実装
-  - タイトル画面から5x5のステージ表を開ける。
-  - `slot` / `displayNo` / `label` / `subtitle` / `description` を表示に使う。
+  - タイトル画面からStage 1〜5＋シークレット枠の縦型ルートを開ける。
+  - `selectable` / `slot` / `displayNo` / `subtitle` / `description` を表示に使う。
+  - `unlockAfter` で一本道に解放する。
+  - 未解放Stageは番号を残して名称だけ`???`で伏せ、InfinityはStage 5クリア前には空の外枠だけ表示する。
   - 選択したstageIdを `Game` に渡す。
   - stageIdごとのハイスコアを保存し、ステージ選択パネルに表示する。
   - 固定ステージのクリア済みフラグを保存し、ステージマスに`CLEAR`を表示する。
@@ -49,10 +51,11 @@
   - 指定ジャンルや指定levelsに該当問題がない場合、現在は全問題へフォールバックする。
   - 本番では定義ミスとして検出するか、明示的なfallback設定を用意する。
 
-- 問題難度管理の責務を整理する
-  - 固定Stageでは `quiz.levels` を使う。
-  - Infinityでは `levelsByWave` やruleごとの `levels` を使う。
-  - 旧 `levelMax` はlegacy互換用に残っている。
+- [x] 問題難度管理の責務を `levels` に一本化する
+  - 固定Stageとruleでは `quiz.levels` を使う。
+  - Infinityの `levelsByWave` はWave生成時に `levels` へ解決する。
+  - LegacyもWave番号から `levels` 配列を生成する。
+  - 旧 `maxQuestionLevel` / `levelMax` とレベル解放状態は削除済み。
 
 - [x] スキーマ説明を整備する
   - `stage_defs.js` と `infinity_stage_def.js` の記載ルールを整理する。
@@ -65,7 +68,7 @@
 ## 次にやる候補
 
 1. `stageId = 'infinity'` に一時切り替えてInfinity生成を検証する。
-2. タイトル画面に5x5ステージ選択UIを追加する。
+2. 縦型ステージ選択UIを実機で確認して調整する。
 3. 新Infinityが安定したらlegacy削除方針を決める。
 4. `s01`を実プレイしてHP、速度、タイマー、ジャンルを調整する。
 5. `stage_defs.js` / `infinity_stage_def.js` のスキーマコメントを整理する。

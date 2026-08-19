@@ -457,18 +457,21 @@ html, body {
   font-size: 14px;
   color: var(--primary);
   text-shadow: var(--glow-primary);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 #stage-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(42px, 1fr));
-  gap: 8px;
-  margin: 0 auto 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 auto 12px;
+  width: min(100%, 360px);
 }
 
 .stage-cell {
-  aspect-ratio: 1;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 68px 0 12px;
   border: 2px solid #263858;
   border-radius: 2px;
   background:
@@ -476,11 +479,11 @@ html, body {
     #0f1730;
   color: #00cc6a;
   font-family: var(--font-retro);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   position: relative;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),
@@ -489,19 +492,47 @@ html, body {
   transition: transform 0.08s, border-color 0.08s, background 0.08s, opacity 0.08s;
 }
 
+.stage-cell-main {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  text-align: left;
+}
+
 .stage-cell-no {
   line-height: 1;
+  color: inherit;
+}
+
+.stage-cell-name {
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid rgba(0, 255, 136, 0.18);
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-jp);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  white-space: nowrap;
 }
 
 .stage-cell-clear {
   position: absolute;
-  left: 50%;
-  bottom: 9px;
+  right: 12px;
+  top: 50%;
   font-size: 7px;
   line-height: 1;
+  transform: translateY(-50%);
+}
+
+.stage-cell-clear {
   color: #ffd93d;
   text-shadow: 0 0 8px rgba(255, 217, 61, 0.65);
-  transform: translateX(-50%);
 }
 
 .stage-cell.cleared {
@@ -525,20 +556,8 @@ html, body {
   text-shadow: 0 0 10px rgba(0, 255, 136, 0.8);
 }
 
-.stage-cell.empty {
-  opacity: 0.34;
-  cursor: default;
-  color: rgba(136, 136, 170, 0.24);
-  border-color: rgba(0, 255, 136, 0.14);
-  background: #070a18;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-    inset 0 0 12px rgba(0, 0, 0, 0.45);
-  text-shadow: none;
-}
-
 .stage-cell.locked {
-  opacity: 0.48;
+  opacity: 0.52;
   cursor: default;
   color: rgba(0, 204, 106, 0.34);
   border-color: rgba(0, 255, 136, 0.18);
@@ -549,6 +568,22 @@ html, body {
     inset 0 0 0 1px rgba(0, 255, 136, 0.04),
     inset 0 -5px 0 rgba(0, 0, 0, 0.34);
   text-shadow: 0 0 5px rgba(0, 255, 136, 0.16);
+}
+
+.stage-cell.secret {
+  padding: 0;
+  opacity: 0.38;
+  border-color: rgba(136, 136, 170, 0.22);
+  background: transparent;
+  box-shadow: none;
+}
+
+.stage-cell-name-concealed {
+  color: rgba(184, 184, 210, 0.42);
+  font-family: var(--font-retro);
+  font-size: 9px;
+  letter-spacing: 5px;
+  text-shadow: 0 0 9px rgba(184, 184, 210, 0.22);
 }
 
 #stage-confirm {
@@ -568,10 +603,10 @@ html, body {
       rgba(0, 255, 136, 0.16)
     ) border-box;
   color: var(--text);
-  padding: 12px;
+  padding: 10px 12px;
   cursor: pointer;
   display: grid;
-  gap: 5px;
+  gap: 4px;
   text-align: center;
   position: relative;
   box-shadow:
@@ -582,19 +617,6 @@ html, body {
 
 #stage-confirm:active {
   transform: translateY(2px);
-}
-
-#stage-selected-label {
-  font-family: var(--font-retro);
-  font-size: 10px;
-  color: var(--primary);
-}
-
-#stage-selected-subtitle {
-  font-family: var(--font-jp);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
 }
 
 #stage-selected-description {
@@ -746,6 +768,11 @@ html, body {
   .char-slot { width: 40px; height: 40px; font-size: 18px; }
   #question-text { font-size: 14px; }
   #quiz-panel { padding: 8px 12px 12px; }
+  .stage-select-title { margin-bottom: 8px; }
+  #stage-grid { gap: 4px; margin-bottom: 8px; }
+  .stage-cell { min-height: 40px; }
+  #stage-confirm { padding: 7px 10px; gap: 2px; }
+  #stage-select-screen > .blink { margin-top: 8px; }
 }
 
 @media (max-width: 360px) {

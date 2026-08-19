@@ -6,6 +6,9 @@
 //
 // 各ステージは以下のプロパティを持ちます。
 // - slot: ステージ選択UI上の枠番号（例: 1）
+// - selectable: true のステージだけをステージ選択UIに表示
+// - unlockAfter: 指定したstageIdのクリア後に解放
+// - hiddenUntilUnlocked: 解放前は名称や番号を伏せたシークレット枠として表示
 // - displayNo: ステージ選択UI上の表示番号（例: '01'）
 // - label: ステージ番号などの短い表示名（例: 'STAGE 01'）
 // - subtitle: ステージのシナリオ名（例: 'くだもの秘密基地'）
@@ -38,9 +41,13 @@
 // - width, height: ボスのサイズ
 // - speed: ボスの横移動速度
 // - descent: ボスの降下速度
-// - design: ボスの見た目（'fortress', 'wing', 'core'）
+// - design: ボスの見た目（'fortress', 'wing', 'core', 'face', 'skull'）
 // - pattern: クイズの問題文や文字を隠す特殊攻撃の配列（例: ['scramble(1)', 'blind(2)']）
+// - patternCycle: 問題ごとに順番に切り替える特殊攻撃（空配列なら妨害なし）
 // - patternProb: 特殊攻撃が発動する確率 (0.0 〜 1.0)
+// - blindGrowth: BLINDの隠す文字数を出題数で増やす設定（例: { base: 1, every: 2 }）
+// - knockbackPerDamage: 1ダメージごとにボスを上へ押し戻す距離
+// - centerShot: 画面中央を狙う攻撃の頻度・予告・弾速・回避受付時間・後半パターン
 // ==========================================
 
 import { INFINITY_STAGE_DEF } from './infinity_stage_def.js';
@@ -55,59 +62,37 @@ export const STAGE_DEFS = {
 
   s01: {
     slot: 1,
+    selectable: true,
     displayNo: '01',
     label: 'STAGE 01',
-    subtitle: 'くだもの秘密基地',
-    description: 'くだもの・たべもの中心の出撃訓練',
-    clearMessage: 'FRUIT BASE',
+    subtitle: 'もぐもぐ秘密基地',
+    description: 'くだもの・たべもののやさしい入門ステージ',
+    clearMessage: 'MOGUMOGU BASE',
     backgroundColor: '#071824',
     waves: [
       {
         type: 'normal',
         message: 'WAVE 1',
-        quiz: { genres: ['くだもの', 'たべもの'], levels: [1], timerSec: 15 },
+        quiz: { genres: ['くだもの'], levels: [1], timerSec: 15 },
         enemies: { cols: 4, rows: 2, mobs: ['scout'], speed: 0.35, descent: 0.05 },
       },
       {
         type: 'normal',
         message: 'WAVE 2',
-        quiz: { genres: ['いきもの'], levels: [1], timerSec: 15 },
-        enemies: { cols: 5, rows: 2, mobs: ['scout', 'drone'], speed: 0.4, descent: 0.055 },
-      },
-      {
-        type: 'normal',
-        message: 'WAVE 3',
-        quiz: { genres: ['くらし', 'からだ'], levels: [1], timerSec: 14 },
-        enemies: { cols: 5, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.45, descent: 0.06 },
-      },
-      {
-        type: 'boss',
-        message: 'WARNING: MINI BOSS',
-        quiz: { genres: ['サブカル'], levels: [1], timerSec: 13 },
-        boss: {
-          hp: 18,
-          width: 96,
-          height: 64,
-          speed: 0.75,
-          descent: 0.018,
-          design: 'core',
-          pattern: ['scramble(1)'],
-          patternProb: 0.7,
-        },
+        quiz: { genres: ['たべもの'], levels: [1], timerSec: 15 },
+        enemies: { cols: 6, rows: 2, mobs: ['scout', 'drone'], speed: 0.4, descent: 0.055 },
       },
       {
         type: 'boss',
         message: 'WARNING: BOSS WAVE',
-        quiz: { genres: ['mixed'], levels: [1], timerSec: 12 },
+        quiz: { genres: ['くだもの', 'たべもの'], levels: [1, 2], timerSec: 14 },
         boss: {
-          hp: 35,
+          hp: 60,
           width: 120,
           height: 80,
-          speed: 0.9,
-          descent: 0.02,
+          speed: 0.6,
+          descent: 0.012,
           design: 'fortress',
-          pattern: ['scramble(1)'],
-          patternProb: 1,
         },
       },
     ],
@@ -115,10 +100,12 @@ export const STAGE_DEFS = {
 
   s02: {
     slot: 2,
+    selectable: true,
+    unlockAfter: 's01',
     displayNo: '02',
     label: 'STAGE 02',
     subtitle: 'どうぶつ観測所',
-    description: 'いきもの中心の追撃訓練',
+    description: 'いきもの・しぜんと最初の妨害訓練',
     clearMessage: 'ANIMAL OBSERVATORY',
     backgroundColor: '#081a18',
     waves: [
@@ -126,47 +113,26 @@ export const STAGE_DEFS = {
         type: 'normal',
         message: 'WAVE 1',
         quiz: { genres: ['いきもの'], levels: [1], timerSec: 15 },
-        enemies: { cols: 4, rows: 2, mobs: ['scout'], speed: 0.36, descent: 0.05 },
+        enemies: { cols: 5, rows: 2, mobs: ['scout'], speed: 0.4, descent: 0.052 },
       },
       {
         type: 'normal',
         message: 'WAVE 2',
-        quiz: { genres: ['いきもの', 'しぜん'], levels: [1], timerSec: 15 },
-        enemies: { cols: 5, rows: 2, mobs: ['scout', 'guard'], speed: 0.42, descent: 0.055 },
-      },
-      {
-        type: 'normal',
-        message: 'WAVE 3',
-        quiz: { genres: ['いきもの'], levels: [1, 2], timerSec: 14 },
-        enemies: { cols: 5, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.48, descent: 0.06 },
-      },
-      {
-        type: 'boss',
-        message: 'WARNING: MINI BOSS',
-        quiz: { genres: ['いきもの'], levels: [1, 2], timerSec: 13 },
-        boss: {
-          hp: 20,
-          width: 96,
-          height: 64,
-          speed: 0.78,
-          descent: 0.018,
-          design: 'wing',
-          pattern: ['scramble(1)'],
-          patternProb: 0.7,
-        },
+        quiz: { genres: ['しぜん'], levels: [1], timerSec: 14 },
+        enemies: { cols: 7, rows: 2, mobs: ['scout', 'guard'], speed: 0.46, descent: 0.058 },
       },
       {
         type: 'boss',
         message: 'WARNING: BOSS WAVE',
-        quiz: { genres: ['いきもの', 'しぜん'], levels: [1, 2], timerSec: 12 },
+        quiz: { genres: ['いきもの', 'しぜん'], levels: [1, 2], timerSec: 14 },
         boss: {
-          hp: 38,
+          hp: 65,
           width: 120,
           height: 80,
-          speed: 0.95,
-          descent: 0.02,
+          speed: 0.7,
+          descent: 0.014,
           design: 'wing',
-          pattern: ['blind(1)'],
+          pattern: ['marquee(4)'],
           patternProb: 1,
         },
       },
@@ -175,6 +141,8 @@ export const STAGE_DEFS = {
 
   s03: {
     slot: 3,
+    selectable: true,
+    unlockAfter: 's02',
     displayNo: '03',
     label: 'STAGE 03',
     subtitle: 'からだ整備工場',
@@ -185,49 +153,42 @@ export const STAGE_DEFS = {
       {
         type: 'normal',
         message: 'WAVE 1',
-        quiz: { genres: ['からだ'], levels: [1], timerSec: 15 },
-        enemies: { cols: 5, rows: 2, mobs: ['scout', 'guard'], speed: 0.38, descent: 0.052 },
+        quiz: { genres: ['からだ'], levels: [1], timerSec: 14 },
+        enemies: { cols: 6, rows: 2, mobs: ['scout', 'guard'], speed: 0.44, descent: 0.056 },
       },
       {
         type: 'normal',
         message: 'WAVE 2',
         quiz: { genres: ['くらし'], levels: [1], timerSec: 14 },
-        enemies: { cols: 5, rows: 3, mobs: ['scout', 'guard', 'scout'], speed: 0.44, descent: 0.058 },
-      },
-      {
-        type: 'normal',
-        message: 'WAVE 3',
-        quiz: { genres: ['からだ', 'くらし'], levels: [1, 2], timerSec: 14 },
-        enemies: { cols: 6, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.5, descent: 0.064 },
+        enemies: { cols: 4, rows: 4, mobs: ['scout', 'guard', 'drone', 'guard'], speed: 0.5, descent: 0.062 },
       },
       {
         type: 'boss',
         message: 'WARNING: MINI BOSS',
-        quiz: { genres: ['からだ'], levels: [1, 2], timerSec: 13 },
+        quiz: { genres: ['からだ', 'くらし'], levels: [1], timerSec: 14 },
         boss: {
-          hp: 22,
+          hp: 20,
           width: 96,
           height: 64,
-          speed: 0.82,
-          descent: 0.019,
+          speed: 0.75,
+          descent: 0.075,
           design: 'core',
-          pattern: ['blind(1)'],
-          patternProb: 0.8,
         },
       },
       {
         type: 'boss',
         message: 'WARNING: BOSS WAVE',
-        quiz: { genres: ['からだ', 'くらし'], levels: [1, 2], timerSec: 12 },
+        quiz: { genres: ['からだ', 'くらし'], levels: [1, 2], timerSec: 14 },
         boss: {
-          hp: 42,
+          hp: 70,
           width: 120,
           height: 80,
-          speed: 1.0,
-          descent: 0.021,
+          speed: 0.8,
+          descent: 0.016,
           design: 'core',
-          pattern: ['scramble(1)'],
-          patternProb: 1,
+          pattern: ['blind(1)'],
+          patternProb: 0.7,
+          blindGrowth: { base: 1, every: 2 },
         },
       },
     ],
@@ -235,58 +196,51 @@ export const STAGE_DEFS = {
 
   s04: {
     slot: 4,
+    selectable: true,
+    unlockAfter: 's03',
     displayNo: '04',
     label: 'STAGE 04',
-    subtitle: 'しぜん発電所',
-    description: 'しぜん・ちめいの広域演習',
-    clearMessage: 'NATURE PLANT',
+    subtitle: 'まなび発電所',
+    description: 'がくもん・ちめいの知識演習',
+    clearMessage: 'LEARNING PLANT',
     backgroundColor: '#071b24',
     waves: [
       {
         type: 'normal',
         message: 'WAVE 1',
-        quiz: { genres: ['しぜん'], levels: [1], timerSec: 15 },
-        enemies: { cols: 5, rows: 2, mobs: ['scout', 'drone'], speed: 0.4, descent: 0.054 },
+        quiz: { genres: ['がくもん'], levels: [1], timerSec: 14 },
+        enemies: { cols: 6, rows: 2, mobs: ['scout', 'drone'], speed: 0.48, descent: 0.06 },
       },
       {
         type: 'normal',
         message: 'WAVE 2',
         quiz: { genres: ['ちめい'], levels: [1], timerSec: 14 },
-        enemies: { cols: 6, rows: 2, mobs: ['scout', 'guard'], speed: 0.46, descent: 0.06 },
+        enemies: { cols: 7, rows: 2, mobs: ['scout', 'guard'], speed: 0.52, descent: 0.064 },
       },
       {
         type: 'normal',
         message: 'WAVE 3',
-        quiz: { genres: ['しぜん', 'ちめい'], levels: [1, 2], timerSec: 13 },
-        enemies: { cols: 6, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.54, descent: 0.066 },
+        quiz: { genres: ['がくもん'], levels: [1, 2], timerSec: 13 },
+        enemies: { cols: 6, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.56, descent: 0.068 },
       },
       {
-        type: 'boss',
-        message: 'WARNING: MINI BOSS',
-        quiz: { genres: ['しぜん'], levels: [1, 2], timerSec: 12 },
-        boss: {
-          hp: 24,
-          width: 100,
-          height: 66,
-          speed: 0.86,
-          descent: 0.019,
-          design: 'fortress',
-          pattern: ['blind(1)'],
-          patternProb: 0.8,
-        },
+        type: 'normal',
+        message: 'WAVE 4',
+        quiz: { genres: ['ちめい'], levels: [2, 3], timerSec: 13 },
+        enemies: { cols: 5, rows: 4, mobs: ['scout', 'guard', 'drone', 'guard'], speed: 0.6, descent: 0.072 },
       },
       {
         type: 'boss',
         message: 'WARNING: BOSS WAVE',
-        quiz: { genres: ['しぜん', 'ちめい'], levels: [1, 2], timerSec: 12 },
+        quiz: { genres: ['がくもん', 'ちめい'], levels: [1, 2, 3], timerSec: 12 },
         boss: {
-          hp: 46,
+          hp: 80,
           width: 124,
           height: 82,
-          speed: 1.05,
-          descent: 0.021,
+          speed: 0.9,
+          descent: 0.018,
           design: 'fortress',
-          pattern: ['blind(2)'],
+          pattern: ['scramble(1)'],
           patternProb: 1,
         },
       },
@@ -295,6 +249,8 @@ export const STAGE_DEFS = {
 
   s05: {
     slot: 5,
+    selectable: true,
+    unlockAfter: 's04',
     displayNo: '05',
     label: 'STAGE 05',
     subtitle: 'おもちゃ遊撃隊',
@@ -305,48 +261,42 @@ export const STAGE_DEFS = {
       {
         type: 'normal',
         message: 'WAVE 1',
-        quiz: { genres: ['あそびと文化'], levels: [1], timerSec: 14 },
-        enemies: { cols: 5, rows: 3, mobs: ['scout', 'guard', 'drone'], speed: 0.42, descent: 0.056 },
-      },
-      {
-        type: 'normal',
-        message: 'WAVE 2',
-        quiz: { genres: ['サブカル'], levels: [1], timerSec: 14 },
-        enemies: { cols: 6, rows: 3, mobs: ['scout', 'drone', 'guard'], speed: 0.5, descent: 0.062 },
-      },
-      {
-        type: 'normal',
-        message: 'WAVE 3',
-        quiz: { genres: ['あそびと文化', 'サブカル'], levels: [1, 2], timerSec: 13 },
-        enemies: { cols: 6, rows: 4, mobs: ['scout', 'guard', 'drone', 'guard'], speed: 0.58, descent: 0.068 },
-      },
-      {
-        type: 'boss',
-        message: 'WARNING: MINI BOSS',
-        quiz: { genres: ['あそびと文化'], levels: [1, 2], timerSec: 12 },
-        boss: {
-          hp: 26,
-          width: 100,
-          height: 66,
-          speed: 0.9,
-          descent: 0.02,
-          design: 'wing',
-          pattern: ['scramble(1)'],
-          patternProb: 0.85,
-        },
+        quiz: { genres: ['くだもの'], levels: [1, 2, 3], timerSec: 14 },
+        enemies: { cols: 1, rows: 1, mobs: ['scout'], speed: 0.25, descent: 0.025 },
       },
       {
         type: 'boss',
         message: 'WARNING: BOSS WAVE',
-        quiz: { genres: ['あそびと文化', 'サブカル'], levels: [1, 2], timerSec: 11 },
+        quiz: { genres: ['あそびと文化', 'サブカル', 'げいのう', 'にっち'], levels: [1, 2, 3, 4], timerSec: 13 },
         boss: {
-          hp: 50,
-          width: 124,
-          height: 82,
-          speed: 1.1,
-          descent: 0.022,
-          design: 'core',
-          pattern: ['scramble(1)', 'blind(1)'],
+          hp: 55,
+          width: 120,
+          height: 84,
+          speed: 0.85,
+          descent: 0.016,
+          design: 'face',
+        },
+      },
+      {
+        type: 'boss',
+        message: 'WARNING: FINAL BOSS',
+        quiz: { genres: ['mixed'], levels: [1, 2, 3, 4], timerSec: 11 },
+        boss: {
+          hp: 120,
+          width: 136,
+          height: 92,
+          speed: 1,
+          descent: 0.018,
+          design: 'skull',
+          knockbackPerDamage: 0.75,
+          centerShot: {
+            everyQuestions: 3,
+            warningFrames: 60,
+            travelFrames: 45,
+            dodgeFrames: 15,
+            latePattern: { fromQuestion: 9, pattern: ['marquee(4)'] },
+          },
+          patternCycle: [['blind(1)'], ['scramble(1)'], []],
           patternProb: 1,
         },
       },

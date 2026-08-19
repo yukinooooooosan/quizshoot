@@ -8,11 +8,12 @@ function parsePattern(str) {
 }
 
 export class QuizManager {
-  constructor({ onCorrect, onWrong, onTimeUp, onInput }) {
+  constructor({ onCorrect, onWrong, onTimeUp, onInput, onAnswerResolved }) {
     this.onCorrect = onCorrect;
     this.onWrong = onWrong;
     this.onTimeUp = onTimeUp;
     this.onInput = onInput || (() => { });
+    this.onAnswerResolved = onAnswerResolved || (() => { });
 
     // DOM
     this.questionEl = document.getElementById('question-text');
@@ -50,11 +51,11 @@ export class QuizManager {
     this.activeBeforePause = false;
     this.usedIndices = [];
     this.shuffledQuestions = [];
+    this.questionsShown = 0;
     this.currentWave = 1;
     this.pendingBossPattern = null;
-    this.maxQuestionLevel = 1;
     this.allowedGenres = null;
-    this.allowedLevels = null;
+    this.allowedLevels = [1];
 
     this._bindEvents();
   }
@@ -101,9 +102,7 @@ export class QuizManager {
   _shuffleQuestions() {
     const questionPool = questions.filter(q => {
       const qLevel = q.level || 1;
-      const levelOk = this.allowedLevels
-        ? this.allowedLevels.includes(qLevel)
-        : qLevel <= this.maxQuestionLevel;
+      const levelOk = this.allowedLevels.includes(qLevel);
       const genreOk = !this.allowedGenres
         || this.allowedGenres.includes('mixed')
         || this.allowedGenres.includes(q.genre);
@@ -292,6 +291,7 @@ export class QuizManager {
     const gaugeRatio = Math.max(0, this.timer / this.timerMax);
     const playerAnswer = this.inputChars.join('');
     const correct = playerAnswer === this.currentQuestion.answer;
+    this.onAnswerResolved(correct, gaugeRatio);
 
     if (correct) {
       for (const slot of this.slots) slot.classList.add('correct');
@@ -434,25 +434,21 @@ export class QuizManager {
     else this.timerMax = 8;
   }
 
-  setMaxQuestionLevel(level) {
-    this.maxQuestionLevel = Math.max(1, Math.min(4, level));
-    this.allowedLevels = null;
-    this.shuffledQuestions = [];
-  }
-
-  setQuestionFilter({ genres = null, levels = null, levelMax = this.maxQuestionLevel, timerSec = null } = {}) {
-    this.maxQuestionLevel = Math.max(1, Math.min(4, levelMax));
+  setQuestionFilter({ genres = null, levels = [1], timerSec = null } = {}) {
     this.allowedGenres = Array.isArray(genres) && genres.length > 0 ? genres : null;
-    this.allowedLevels = Array.isArray(levels) && levels.length > 0
+    const normalizedLevels = Array.isArray(levels) && levels.length > 0
       ? [...new Set(levels.map(level => Math.max(1, Math.min(4, level))))]
-      : null;
+      : [1];
+    this.allowedLevels = normalizedLevels;
     if (timerSec) this.timerMax = timerSec;
     this.shuffledQuestions = [];
+    this.questionsShown = 0;
   }
 
   // 問題をプレビュー表示（READY中：問題文表示、D-padはブランク、タイマー未開始）
   showQuestionPreview() {
     this.currentQuestion = this._nextQuestion();
+    this.questionsShown++;
     this.inputChars = [];
     this.inputPos = 0;
 
@@ -488,6 +484,7 @@ export class QuizManager {
   // 新しい問題を出題（READY/GOなしで即開始する場合）
   showQuestion() {
     this.currentQuestion = this._nextQuestion();
+    this.questionsShown++;
     this.inputChars = [];
     this.inputPos = 0;
 
@@ -551,7 +548,7 @@ export class QuizManager {
   // リセット
   reset() {
     this.stop();
-    this.setQuestionFilter({ genres: null, levelMax: 1, timerSec: 15 });
+    this.setQuestionFilter({ genres: null, levels: [1], timerSec: 15 });
     this._shuffleQuestions();
     this.inputChars = [];
     this.inputPos = 0;

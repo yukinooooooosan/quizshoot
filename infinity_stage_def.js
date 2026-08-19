@@ -77,7 +77,10 @@
 // ==========================================
 
 export const INFINITY_STAGE_DEF = {
-  slot: 25,
+  slot: 6,
+  selectable: true,
+  unlockAfter: 's05',
+  hiddenUntilUnlocked: true,
   displayNo: '∞',
   label: 'INFINITY',
   subtitle: '無限宙域',
