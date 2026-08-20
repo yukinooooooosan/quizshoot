@@ -255,7 +255,7 @@ export const STAGE_DEFS = {
     displayNo: '05',
     label: 'STAGE 05',
     subtitle: '最終決戦',
-    description: 'あそびと文化・サブカルの入口',
+    description: 'すべての知識を総動員して最終決戦に挑め',
     clearMessage: 'PLAY SQUAD',
     backgroundColor: '#0a0a1a',
     waves: [
