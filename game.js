@@ -37,6 +37,21 @@ const COMBO_RANKS = [
 const SCORE_MULTIPLIER = { hit: 1.0, great: 1.5, perfect: 2.0, ace: 3.0 };
 const WRONG_ANSWER_DROP = 20;
 const DANGER_ATTACK_BONUS_BY_RANK = [5, 3, 2, 1];
+const WAVE_BACKGROUND_FADE_MS = 1500;
+
+function mixHexColors(fromColor, toColor, ratio) {
+  const from = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(fromColor);
+  const to = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(toColor);
+  if (!from || !to) return ratio < 1 ? fromColor : toColor;
+
+  const eased = ratio * ratio * (3 - 2 * ratio);
+  const channels = [1, 2, 3].map(index => {
+    const start = parseInt(from[index], 16);
+    const end = parseInt(to[index], 16);
+    return Math.round(start + (end - start) * eased).toString(16).padStart(2, '0');
+  });
+  return `#${channels.join('')}`;
+}
 
 // ボスウェーブ定義テーブル
 // pattern: 'scramble(n)' = n個のボタンを？に隠す, 'blind(n)' = 問題文をn文字マスク
@@ -491,6 +506,7 @@ class Game {
     this.stageClearElapsedMs = 0;
     this.stageClearTitle = '';
     this.stageClearSubMessage = '';
+    this.backgroundTransition = null;
     this.readyMsg = ''; this.readyMsgTimer = 0;
     this.bossAttackIncoming = false;
     this.centerShot = null;
@@ -628,6 +644,7 @@ class Game {
 
   _togglePause() {
     if (this.state === 'paused') {
+      if (this.backgroundTransition) this.backgroundTransition.lastTick = performance.now();
       this.state = this.pausedFromState || 'playing';
       this.pausedFromState = null;
       this.quiz.resume();
@@ -636,6 +653,7 @@ class Game {
       return;
     }
     if (this.state !== 'playing' && this.state !== 'waveTransition') return;
+    if (this.backgroundTransition) this.backgroundTransition.lastTick = performance.now();
     this.pausedFromState = this.state;
     this.state = 'paused';
     this.quiz.pause();
@@ -678,6 +696,40 @@ class Game {
       return createInfinityWaveDef(stage, this.wave);
     }
     return createLegacyWaveDef(this.wave);
+  }
+
+  _getWaveBackgroundColor(waveDef = this._getWaveDef()) {
+    return waveDef.backgroundColor || this._getStageDef().backgroundColor || '#0a0a1a';
+  }
+
+  _getCurrentBackgroundColor() {
+    const transition = this.backgroundTransition;
+    if (!transition) return this._getWaveBackgroundColor();
+    const ratio = Math.min(1, transition.elapsedMs / transition.durationMs);
+    return mixHexColors(transition.fromColor, transition.toColor, ratio);
+  }
+
+  _startBackgroundTransition(fromColor, toColor) {
+    if (fromColor === toColor) {
+      this.backgroundTransition = null;
+      return;
+    }
+    this.backgroundTransition = {
+      fromColor,
+      toColor,
+      durationMs: WAVE_BACKGROUND_FADE_MS,
+      elapsedMs: 0,
+      lastTick: performance.now(),
+    };
+  }
+
+  _updateBackgroundTransition() {
+    const transition = this.backgroundTransition;
+    if (!transition) return;
+    const now = performance.now();
+    transition.elapsedMs += Math.max(0, now - transition.lastTick);
+    transition.lastTick = now;
+    if (transition.elapsedMs >= transition.durationMs) this.backgroundTransition = null;
   }
 
   _getWaveMessage(waveDef = this._getWaveDef()) {
@@ -928,6 +980,7 @@ class Game {
     this.stageClearElapsedMs = 0;
     this.stageClearTitle = '';
     this.stageClearSubMessage = '';
+    this.backgroundTransition = null;
     this.chargeReady = false;
     this.chargeActive = false;
     this.chargeFlashTimer = 0;
@@ -1118,7 +1171,9 @@ class Game {
   }
 
   _nextWave() {
+    const previousBackgroundColor = this._getCurrentBackgroundColor();
     this.wave++;
+    this._startBackgroundTransition(previousBackgroundColor, this._getWaveBackgroundColor());
     this.bullets = [];
     this.waveEl.textContent = this._getWaveLabel();
     this.state = 'waveTransition';
@@ -1129,7 +1184,7 @@ class Game {
     this._updatePauseButton();
     this._setGameTimeout(() => {
       if (this.state === 'waveTransition') this._startWaveSequence();
-    }, 1500);
+    }, WAVE_BACKGROUND_FADE_MS);
   }
 
   _clearWave() {
@@ -1527,6 +1582,7 @@ class Game {
   _update() {
     if (this.state === 'paused') return;
 
+    this._updateBackgroundTransition();
     this.frameCount++;
     for (const s of this.stars) s.update();
     this.particles = this.particles.filter(p => p.life > 0);
@@ -1672,7 +1728,7 @@ class Game {
     ctx.translate(sx, sy);
 
     // 背景
-    ctx.fillStyle = this._getStageDef().backgroundColor || '#0a0a1a';
+    ctx.fillStyle = this._getCurrentBackgroundColor();
     ctx.fillRect(-10, -10, CW + 20, CH + 20);
     for (const s of this.stars) s.draw(ctx);
 

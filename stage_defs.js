@@ -17,6 +17,7 @@
 // - clearMessage: ステージクリア時に表示する専用メッセージ（固定ステージ用）
 // - backgroundColor: 背景色
 // - waves: 固定ステージの場合、各Waveの設定を配列で定義します。
+//   Wave側の backgroundColor で、そのWaveだけ背景色を上書きできます。
 //
 // 【 各Wave（waveDef）の基本プロパティ 】
 // - type: 'normal'（通常ウェーブ） または 'boss'（ボスウェーブ）
@@ -253,10 +254,10 @@ export const STAGE_DEFS = {
     unlockAfter: 's04',
     displayNo: '05',
     label: 'STAGE 05',
-    subtitle: 'おもちゃ遊撃隊',
+    subtitle: '最終決戦',
     description: 'あそびと文化・サブカルの入口',
     clearMessage: 'PLAY SQUAD',
-    backgroundColor: '#171329',
+    backgroundColor: '#0a0a1a',
     waves: [
       {
         type: 'normal',
@@ -267,6 +268,7 @@ export const STAGE_DEFS = {
       {
         type: 'boss',
         message: 'WARNING: BOSS WAVE',
+        backgroundColor: '#160b1e',
         quiz: { genres: ['あそびと文化', 'サブカル', 'げいのう', 'にっち'], levels: [1, 2, 3, 4], timerSec: 13 },
         boss: {
           hp: 55,
@@ -280,6 +282,7 @@ export const STAGE_DEFS = {
       {
         type: 'boss',
         message: 'WARNING: FINAL BOSS',
+        backgroundColor: '#1a070c',
         quiz: { genres: ['mixed'], levels: [1, 2, 3, 4], timerSec: 11 },
         boss: {
           hp: 120,
