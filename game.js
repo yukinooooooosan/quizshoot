@@ -53,6 +53,11 @@ function mixHexColors(fromColor, toColor, ratio) {
   return `#${channels.join('')}`;
 }
 
+function trackAnalyticsEvent(eventName, parameters = {}) {
+  if (typeof window.gtag !== 'function') return;
+  window.gtag('event', eventName, parameters);
+}
+
 // ボスウェーブ定義テーブル
 // pattern: 'scramble(n)' = n個のボタンを？に隠す, 'blind(n)' = 問題文をn文字マスク
 // design: 'fortress' | 'wing' | 'core' | 'face' | 'skull'
@@ -555,6 +560,7 @@ class Game {
         this.centerShot = null;
         this.powerUpMsg = 'BLOCK!';
         this.powerUpTimer = 45;
+        this._trackEvent('boss_block');
       },
     });
 
@@ -682,6 +688,20 @@ class Game {
   // ========== コンボランク ==========
   _getCurrentRank() {
     return COMBO_RANKS[this.weaponRankIndex];
+  }
+
+  _trackEvent(eventName, parameters = {}) {
+    const elapsedSeconds = this.stageStartTime > 0
+      ? Math.max(0, Math.round((performance.now() - this.stageStartTime) / 1000))
+      : 0;
+    trackAnalyticsEvent(eventName, {
+      stage_id: this.stageId,
+      wave_number: this.wave,
+      score: this.score,
+      weapon_rank: this._getCurrentRank().name.toLowerCase(),
+      elapsed_seconds: elapsedSeconds,
+      ...parameters,
+    });
   }
 
   _getStageDef() {
@@ -989,6 +1009,9 @@ class Game {
     this.gameoverOverlay.classList.add('hidden');
     this._updateUI();
     this._updatePauseButton();
+    this._trackEvent('stage_start', {
+      wave_count: this._getStageDef().waves?.length || 0,
+    });
     this._startWaveSequence();
   }
 
@@ -1053,6 +1076,7 @@ class Game {
     const newRecordEl = document.getElementById('new-record');
     if (isNewRecord) newRecordEl.classList.remove('hidden');
     else newRecordEl.classList.add('hidden');
+    this._trackEvent('game_over', { new_record: isNewRecord ? 1 : 0 });
     this.gameoverOverlay.classList.remove('hidden');
     this._updatePauseButton();
   }
@@ -1087,6 +1111,7 @@ class Game {
     this._saveStageClear();
     this.stageClearTitle = `${stage.label || 'STAGE'} CLEAR!`;
     this.stageClearSubMessage = stage.clearMessage || `${stage.label || 'STAGE'} CLEAR`;
+    this._trackEvent('stage_clear');
     this._updatePauseButton();
   }
 
@@ -1188,6 +1213,7 @@ class Game {
   }
 
   _clearWave() {
+    this._trackEvent('wave_clear', { wave_type: this._getWaveDef().type || 'normal' });
     if (this._isStageComplete()) {
       this._startStageClear();
       return;
@@ -1448,6 +1474,7 @@ class Game {
       this.powerUpMsg = 'DODGE! ▸ CHARGE READY';
       this.powerUpTimer = 60;
       this._explode(playerX, playerY, '#00e5ff', 0.8);
+      this._trackEvent('boss_dodge');
     } else {
       this.centerShot = null;
       this.dodgeTimer = 0;
