@@ -261,9 +261,22 @@ export const STAGE_DEFS = {
     waves: [
       {
         type: 'normal',
-        message: 'WAVE 1',
+        message: '???',
         quiz: { genres: ['くだもの'], levels: [1, 2, 3], timerSec: 14 },
         enemies: { cols: 1, rows: 1, mobs: ['scout'], speed: 0.25, descent: 0.025 },
+      },
+      {
+        type: 'normal',
+        message: 'ENEMY RUSH!',
+        backgroundColor: '#0d1020',
+        quiz: { genres: ['mixed'], levels: [1, 2, 3], timerSec: 14 },
+        enemies: {
+          cols: 8,
+          rows: 3,
+          mobs: ['scout', 'guard', 'drone'],
+          speed: 0.58,
+          descent: 0.045,
+        },
       },
       {
         type: 'boss',
